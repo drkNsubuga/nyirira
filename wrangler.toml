@@ -1,6 +1,7 @@
 name = "nyirira"
 type = "javascript"
 compatibility_date = "2024-12-16"
+dir = ".next/server"
 
 [env.production]
 name = "nyirira-production"
@@ -14,7 +15,7 @@ cwd = "./"
 watch_paths = ["app/**/*.{tsx,ts}", "components/**/*.{tsx,ts}", "lib/**/*.{ts}", "public/**/*"]
 
 [build.upload]
-format = "service-worker"
+format = "modules"
 
 [docs]
 theme = "openapi-3"
