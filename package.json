@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:cf": "wrangler pages build",
+    "deploy": "wrangler pages deploy",
     "start": "next start",
     "lint": "eslint .",
     "test": "jest --runInBand",
@@ -30,7 +32,8 @@
     "jest-environment-jsdom": "^30.5.2",
     "lucide-react": "^1.55.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.149.0"
   },
   "packageManager": "pnpm@12.10.1"
 }

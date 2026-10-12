@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "include": ["/*"],
+  "exclude": [
+    "/robots.txt",
+    "/sitemap.xml",
+    "/favicon.ico",
+    "/public/*",
+    "/_next/*",
+    "/_vercel/*"
+  ]
+}
