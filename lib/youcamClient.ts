@@ -23,21 +23,48 @@ export function shouldUseRealApi(): boolean {
   return ENV_REAL_API_ENABLED;
 }
 
+const ZERO_DIMENSIONS = { width: 0, height: 0 };
+
+/**
+ * Read the intrinsic pixel dimensions of an image from a data URI.
+ *
+ * In a real browser `onload`/`onerror` fire almost immediately. In test
+ * environments (jsdom) images are not actually decoded, so neither event is
+ * guaranteed to fire — we race against a short timeout and fall back to
+ * (0, 0) so callers never hang.
+ */
+function getImageDimensions(
+  imageData: string,
+  timeoutMs = 1000
+): Promise<{ width: number; height: number }> {
+  return new Promise((resolveDimensions) => {
+    if (typeof Image === 'undefined') {
+      resolveDimensions(ZERO_DIMENSIONS);
+      return;
+    }
+
+    const img = new Image();
+    let settled = false;
+
+    const settle = (value: { width: number; height: number }) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolveDimensions(value);
+    };
+
+    const timer = setTimeout(() => settle(ZERO_DIMENSIONS), timeoutMs);
+
+    img.onload = () => settle({ width: img.width, height: img.height });
+    img.onerror = () => settle(ZERO_DIMENSIONS);
+    img.src = imageData;
+  });
+}
+
 function getMockAnalysis(imageData: string): Promise<AnalysisResponse> {
   return new Promise(async (resolve, reject) => {
     try {
-      const img = new Image();
-      const dimensions = await new Promise<{ width: number; height: number }>(
-        (resolveDimensions) => {
-          img.onload = () => {
-            resolveDimensions({ width: img.width, height: img.height });
-          };
-          img.onerror = () => {
-            resolveDimensions({ width: 0, height: 0 });
-          };
-          img.src = imageData;
-        }
-      );
+      const dimensions = await getImageDimensions(imageData);
 
       resolve({
         skinAnalysis: getMockSkinAnalysis(),
@@ -261,16 +288,7 @@ async function callRealYouCamAPI(imageData: string): Promise<AnalysisResponse> {
 
     const vtoData = await vtoResponse.json();
 
-    const img = new Image();
-    const dimensions = await new Promise<{ width: number; height: number }>((resolve) => {
-      img.onload = () => {
-        resolve({ width: img.width, height: img.height });
-      };
-      img.onerror = () => {
-        resolve({ width: 0, height: 0 });
-      };
-      img.src = imageData;
-    });
+    const dimensions = await getImageDimensions(imageData);
 
     return {
       skinAnalysis: transformSkinData(skinData),
