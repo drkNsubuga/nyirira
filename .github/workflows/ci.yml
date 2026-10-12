@@ -11,7 +11,8 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [18.x, 20.x]
+        # Next.js 16 requires Node.js >=20.9.0, so 18.x cannot build the app.
+        node-version: [20.x, 22.x]
     
     runs-on: ${{ matrix.os }}
 
