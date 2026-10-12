@@ -33,8 +33,10 @@ export default function CameraCapture({ onImageCapture }: CameraCaptureProps) {
       if (errorObject.name === 'NotAllowedError' || errorObject.name === 'PermissionDeniedError') {
         setError({
           type: 'permission-denied',
-          message: 'Camera permission denied. Please allow camera access to continue.',
+          message: 'Camera permission denied. Opening file upload instead — pick a recent photo to continue.',
         });
+        // FR5.1: fall back to upload automatically rather than dead-ending.
+        fileInputRef.current?.click();
       } else if (errorObject.name === 'NotSupportedError') {
         setError({
           type: 'not-supported',

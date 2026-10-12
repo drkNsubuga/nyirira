@@ -2,13 +2,16 @@
 
 import { AnalysisResponse } from '@/lib/types';
 import { AlertTriangle, CheckCircle, Leaf, Palette, Shield, ArrowLeft } from 'lucide-react';
+import { ANALYSIS_KEY } from '@/lib/storage';
 
 interface AnalysisDashboardProps {
   analysis: AnalysisResponse;
   onBack: () => void;
+  /** Optional callback to surface a confirmation message (e.g. a toast). */
+  onSaved?: () => void;
 }
 
-export default function AnalysisDashboard({ analysis, onBack }: AnalysisDashboardProps) {
+export default function AnalysisDashboard({ analysis, onBack, onSaved }: AnalysisDashboardProps) {
   const { skinAnalysis, vto } = analysis;
 
   const getScoreColor = (score: number) => {
@@ -35,7 +38,7 @@ export default function AnalysisDashboard({ analysis, onBack }: AnalysisDashboar
       </button>
 
       {/* Skin Health Score Card */}
-      <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-8 mb-6 shadow-lg">
+      <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-8 mb-6 shadow-lg dark:from-slate-800 dark:to-slate-900">
         <h2 className="text-2xl font-bold text-slate-900 mb-6">Skin Health & Safety Score</h2>
 
         <div className="flex items-center justify-between mb-8">
@@ -127,7 +130,7 @@ export default function AnalysisDashboard({ analysis, onBack }: AnalysisDashboar
       )}
 
       {/* Barrier Repair Regimen */}
-      <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-2xl p-8 mb-6 shadow-lg border-2 border-emerald-200">
+      <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-2xl p-8 mb-6 shadow-lg border-2 border-emerald-200 dark:from-emerald-950/60 dark:to-slate-900 dark:border-emerald-900">
         <h3 className="text-xl font-bold text-emerald-900 mb-4 flex items-center gap-2">
           <Leaf className="w-5 h-5" />
           Barrier Repair Regimen (Local & Safe)
@@ -164,7 +167,7 @@ export default function AnalysisDashboard({ analysis, onBack }: AnalysisDashboar
       </div>
 
       {/* VTO Harmonized Look */}
-      <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-2xl p-8 mb-6 shadow-lg border-2 border-amber-200">
+      <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-2xl p-8 mb-6 shadow-lg border-2 border-amber-200 dark:from-amber-950/50 dark:to-slate-900 dark:border-amber-900">
         <h3 className="text-xl font-bold text-amber-900 mb-4 flex items-center gap-2">
           <Palette className="w-5 h-5" />
           Your Harmonized Look
@@ -236,8 +239,8 @@ export default function AnalysisDashboard({ analysis, onBack }: AnalysisDashboar
       <div className="flex gap-4">
         <button
           onClick={() => {
-            localStorage.setItem('nyirira_analysis', JSON.stringify(analysis));
-            alert('Results saved to device storage!');
+            localStorage.setItem(ANALYSIS_KEY, JSON.stringify(analysis));
+            onSaved?.();
           }}
           className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-colors"
         >
@@ -245,7 +248,7 @@ export default function AnalysisDashboard({ analysis, onBack }: AnalysisDashboar
         </button>
         <button
           onClick={onBack}
-          className="flex-1 py-3 px-4 bg-slate-200 hover:bg-slate-300 text-slate-900 font-semibold rounded-lg transition-colors"
+          className="flex-1 py-3 px-4 bg-slate-200 hover:bg-slate-300 text-slate-900 font-semibold rounded-lg transition-colors dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600"
         >
           New Analysis
         </button>

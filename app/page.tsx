@@ -2,12 +2,16 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { AlertCircle, Clock3, Loader2, Share2, Settings, Sparkles } from 'lucide-react';
+import { AlertCircle, Clock3, Download, Loader2, Share2, Settings, Sparkles } from 'lucide-react';
 import CameraCapture from '@/components/CameraCapture';
 import AnalysisDashboard from '@/components/AnalysisDashboard';
+import HistoryCompare from '@/components/HistoryCompare';
+import Toast, { ToastMessage } from '@/components/Toast';
 import { AppState } from '@/lib/types';
-import { addAnalysisToHistory, getAnalysisHistory, getAppSettings } from '@/lib/storage';
+import { ANALYSIS_KEY, addAnalysisToHistory, getAnalysisHistory, getAppSettings } from '@/lib/storage';
 import { analyzeImage } from '@/lib/youcamClient';
+import { compressImage } from '@/lib/image';
+import { exportResultAsPng } from '@/lib/export';
 
 const defaultState: AppState = {
   step: 'capture',
@@ -24,7 +28,7 @@ export default function Home() {
     }
 
     try {
-      const saved = window.localStorage.getItem('nyirira_analysis');
+      const saved = window.localStorage.getItem(ANALYSIS_KEY);
       if (!saved) {
         return defaultState;
       }
@@ -41,6 +45,11 @@ export default function Home() {
 
   const history = useMemo(() => getAnalysisHistory(), []);
   const settings = useMemo(() => getAppSettings(), []);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+
+  const showToast = (variant: ToastMessage['variant'], text: string) => {
+    setToast({ id: Date.now(), variant, text });
+  };
 
   const handleShare = async () => {
     if (!state.analysis || !settings.enableSocialSharing) return;
@@ -59,11 +68,17 @@ export default function Home() {
 
       if (navigator.clipboard) {
         await navigator.clipboard.writeText(shareText);
-        alert('Results copied to clipboard');
+        showToast('success', 'Results copied to clipboard');
       }
     } catch {
-      alert('Sharing was cancelled');
+      showToast('info', 'Sharing was cancelled');
     }
+  };
+
+  const handleExport = () => {
+    if (!state.analysis) return;
+    exportResultAsPng(state.analysis);
+    showToast('success', 'Results image downloaded');
   };
 
   const handleImageCapture = async (imageData: string) => {
@@ -76,18 +91,22 @@ export default function Home() {
     }));
 
     try {
-      const analysis = await analyzeImage(imageData);
+      // Compress/resize before analysis and storage so large uploads don't
+      // blow past the localStorage quota (SRS NF1.4 + FR4.1).
+      const compressed = await compressImage(imageData);
+
+      const analysis = await analyzeImage(compressed);
       const item = {
         id: Date.now().toString(),
         createdAt: new Date().toISOString(),
         summary: `Skin score ${analysis.skinAnalysis.healthScore}/100`,
-        imageData,
+        imageData: compressed,
         analysis,
       };
 
       addAnalysisToHistory(item);
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem('nyirira_analysis', JSON.stringify(analysis));
+        window.localStorage.setItem(ANALYSIS_KEY, JSON.stringify(analysis));
       }
 
       setState((prev) => ({
@@ -119,8 +138,8 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-emerald-50 to-amber-50">
-      <header className="sticky top-0 z-40 bg-white shadow-sm">
+    <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-emerald-50 to-amber-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      <header className="sticky top-0 z-40 bg-white shadow-sm dark:bg-slate-900">
         <div className="max-w-4xl mx-auto px-4 py-6 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Sparkles className="w-6 h-6 text-emerald-600" />
@@ -228,7 +247,15 @@ export default function Home() {
 
           {state.step === 'results' && state.analysis && (
             <div className="space-y-6">
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleExport}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  <Download className="w-4 h-4" />
+                  Export image
+                </button>
                 {settings.enableSocialSharing && (
                   <button
                     type="button"
@@ -241,7 +268,13 @@ export default function Home() {
                 )}
               </div>
 
-              <AnalysisDashboard analysis={state.analysis} onBack={handleBack} />
+              <HistoryCompare current={state.analysis} history={history} />
+
+              <AnalysisDashboard
+                analysis={state.analysis}
+                onBack={handleBack}
+                onSaved={() => showToast('success', 'Results saved to this device')}
+              />
             </div>
           )}
 
@@ -309,6 +342,8 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
+      <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }

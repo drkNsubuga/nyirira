@@ -2,16 +2,25 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { ArrowLeft, Check, Globe, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowLeft, Check, Globe, Moon, ShieldCheck, Sparkles, Sun } from 'lucide-react';
 import { AppSettings, getAppSettings, saveAppSettings } from '@/lib/storage';
+import { applyTheme, getStoredTheme, setStoredTheme, type ThemePreference } from '@/lib/theme';
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings>(() => getAppSettings());
+  const [theme, setTheme] = useState<ThemePreference>(() => getStoredTheme());
 
   const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     const next = { ...settings, [key]: value };
     setSettings(next);
     saveAppSettings(next);
+  };
+
+  const toggleTheme = () => {
+    const next: ThemePreference = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    setStoredTheme(next);
+    applyTheme(next);
   };
 
   return (
@@ -63,20 +72,9 @@ export default function SettingsPage() {
                   <p className="font-medium text-slate-900">Push notifications</p>
                   <p className="text-sm text-slate-600">Reminder updates for skin care and safety guidance.</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => updateSetting('notifications', !settings.notifications)}
-                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition ${
-                    settings.notifications ? 'bg-emerald-600' : 'bg-slate-300'
-                  }`}
-                  aria-label="Toggle notifications"
-                >
-                  <span
-                    className={`inline-block h-5 w-5 rounded-full bg-white transition ${
-                      settings.notifications ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
+                  Coming soon
+                </span>
               </label>
 
               <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4">
@@ -103,6 +101,40 @@ export default function SettingsPage() {
           </section>
 
           <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <h2 className="text-lg font-bold text-slate-900 mb-4">Appearance</h2>
+
+            <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4">
+              <div className="flex items-center gap-3">
+                {theme === 'dark' ? (
+                  <Moon className="w-5 h-5 text-emerald-600" aria-hidden="true" />
+                ) : (
+                  <Sun className="w-5 h-5 text-amber-500" aria-hidden="true" />
+                )}
+                <div>
+                  <p className="font-medium text-slate-900">Dark mode</p>
+                  <p className="text-sm text-slate-600">Easier viewing in low light.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition ${
+                  theme === 'dark' ? 'bg-emerald-600' : 'bg-slate-300'
+                }`}
+                role="switch"
+                aria-checked={theme === 'dark'}
+                aria-label="Toggle dark mode"
+              >
+                <span
+                  className={`inline-block h-5 w-5 rounded-full bg-white transition ${
+                    theme === 'dark' ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </label>
+          </section>
+
+          <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <h2 className="text-lg font-bold text-slate-900 mb-4">Connected Apps</h2>
 
             <div className="space-y-4">
@@ -113,22 +145,12 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <p className="font-medium text-slate-900">Google</p>
-                    <p className="text-sm text-slate-600">
-                      {settings.googleConnected ? 'Connected' : 'Not connected'}
-                    </p>
+                    <p className="text-sm text-slate-600">Account linking is not available yet.</p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => updateSetting('googleConnected', !settings.googleConnected)}
-                  className={`rounded-full px-3 py-2 text-sm font-medium ${
-                    settings.googleConnected
-                      ? 'bg-slate-200 text-slate-800'
-                      : 'bg-emerald-600 text-white'
-                  }`}
-                >
-                  {settings.googleConnected ? 'Disconnect' : 'Connect'}
-                </button>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
+                  Coming soon
+                </span>
               </div>
 
               <div className="flex items-center justify-between rounded-xl border border-slate-200 p-4">
@@ -138,22 +160,12 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <p className="font-medium text-slate-900">Facebook</p>
-                    <p className="text-sm text-slate-600">
-                      {settings.facebookConnected ? 'Connected' : 'Not connected'}
-                    </p>
+                    <p className="text-sm text-slate-600">Account linking is not available yet.</p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => updateSetting('facebookConnected', !settings.facebookConnected)}
-                  className={`rounded-full px-3 py-2 text-sm font-medium ${
-                    settings.facebookConnected
-                      ? 'bg-slate-200 text-slate-800'
-                      : 'bg-emerald-600 text-white'
-                  }`}
-                >
-                  {settings.facebookConnected ? 'Disconnect' : 'Connect'}
-                </button>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
+                  Coming soon
+                </span>
               </div>
             </div>
           </section>

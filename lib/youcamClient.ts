@@ -204,7 +204,13 @@ export async function analyzeImage(imageData: string): Promise<AnalysisResponse>
     try {
       return await callRealYouCamAPI(imageData);
     } catch (error) {
-      console.warn('Real API analysis failed, falling back to mocked results.', error);
+      // Surface the failure instead of silently showing mocked data, which
+      // would mislead the user into thinking the live analysis succeeded.
+      const message =
+        error instanceof Error ? error.message : 'Live YouCam analysis failed unexpectedly.';
+      throw new Error(
+        `${message} Please check your connection or disable the live API in Settings to use the demo analysis.`
+      );
     }
   }
 
@@ -229,7 +235,8 @@ async function fetchWithRetry(url: string, init: RequestInit, maxRetries = 2): P
       }
     }
 
-    const delayMs = 500 * (attempt + 1);
+    // True exponential backoff: 500ms, 1000ms, 2000ms... (SRS FR5.3).
+    const delayMs = 500 * 2 ** attempt;
     await new Promise((resolve) => setTimeout(resolve, delayMs));
     attempt += 1;
   }

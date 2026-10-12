@@ -18,6 +18,7 @@ export type AppSettings = {
 
 export const HISTORY_KEY = 'nyirira_history';
 export const SETTINGS_KEY = 'nyirira_settings';
+export const ANALYSIS_KEY = 'nyirira_analysis';
 
 export const defaultSettings: AppSettings = {
   useRealAPI: false,
