@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint .",
+    "test": "jest --runInBand",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "next": "16.4.0",
@@ -24,6 +26,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
     "jest": "^30.5.2",
+    "jest-environment-jsdom": "^30.5.2",
     "lucide-react": "^1.55.0",
     "tailwindcss": "^4",
     "typescript": "^5"
