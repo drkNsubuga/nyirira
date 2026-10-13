@@ -66,18 +66,24 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      {/* Applies the stored dark-mode preference before hydration to avoid a
-          flash of the light theme. next/script with beforeInteractive is
-          required: raw <script> tags rendered by React are never executed and
-          produce a console error. Next.js hoists this into <head>. */}
-      <Script
-        id="theme-init"
-        strategy="beforeInteractive"
-        dangerouslySetInnerHTML={{
-          __html: `(function(){try{var t=localStorage.getItem('nyirira_theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark');}catch(e){}})();`,
-        }}
-      />
+      <head>
+        {/* Applies the stored dark-mode preference before hydration to avoid a
+            flash of the light theme. next/script with beforeInteractive is
+            required (a raw <script> rendered by React is never executed), and
+            it MUST live inside <head> — a <script> cannot be a direct child of
+            <html> (React 19 static DOM validation). suppressHydrationWarning
+            on <html> is needed because this script mutates <html> classes
+            before hydration. */}
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('nyirira_theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark');}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">{children}</body>
     </html>
   );
