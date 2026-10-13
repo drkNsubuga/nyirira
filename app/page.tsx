@@ -271,10 +271,11 @@ export default function Home() {
                 )}
               </div>
 
-              <HistoryCompare current={analysis} history={history} />
+              <HistoryCompare current={analysis} history={history} currentImageData={state.imageData!} />
 
               <AnalysisDashboard
                 analysis={analysis}
+                imageData={state.imageData!}
                 onBack={handleBack}
                 onSaved={() => showToast('success', 'Results saved to this device')}
               />

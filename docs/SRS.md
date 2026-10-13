@@ -61,6 +61,11 @@ Nyirira is a mobile-responsive, cost-optimized SPA designed for the Ugandan mark
   - Retake button from preview mode
   - Return to selection screen (camera vs. upload)
 
+- **FR1.4**: Image preview with confirmation
+  - Show captured/uploaded image before analysis
+  - Allow user to confirm or retake the image
+  - Display image quality indicator (blur, lighting, composition)
+
 ### FR2: Skin Analysis
 - **FR2.1**: Analyze image for skin conditions
   - Detect/count hyperpigmented spots
@@ -78,6 +83,13 @@ Nyirira is a mobile-responsive, cost-optimized SPA designed for the Ugandan mark
   - Glycerin + shea butter moisturizer
   - Natural oils (argan, jojoba)
   - Include frequency and notes on local availability
+
+- **FR2.4**: Visual condition markers on original image
+  - Overlay circles/annotations for detected spots
+  - Color-coded regions for texture issues
+  - Highlight areas of redness/inflammation
+  - Interactive tooltips showing condition details
+  - Zoom and pan functionality for detailed inspection
 
 ### FR3: Virtual Try-On (VTO) + Colorimetry
 - **FR3.1**: Suggest warm-toned lip shades

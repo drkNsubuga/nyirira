@@ -1,17 +1,19 @@
 'use client';
 
+import ImageOverlay from './ImageOverlay';
 import { AnalysisResponse } from '@/lib/types';
 import { AlertTriangle, CheckCircle, Leaf, Palette, Shield, ArrowLeft } from 'lucide-react';
 import { ANALYSIS_KEY } from '@/lib/storage';
 
 interface AnalysisDashboardProps {
   analysis: AnalysisResponse;
+  imageData: string; // Add imageData prop for ImageOverlay
   onBack: () => void;
   /** Optional callback to surface a confirmation message (e.g. a toast). */
   onSaved?: () => void;
 }
 
-export default function AnalysisDashboard({ analysis, onBack, onSaved }: AnalysisDashboardProps) {
+export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved }: AnalysisDashboardProps) {
   const { skinAnalysis, vto } = analysis;
 
   const getScoreColor = (score: number) => {
@@ -40,6 +42,15 @@ export default function AnalysisDashboard({ analysis, onBack, onSaved }: Analysi
       {/* Skin Health Score Card */}
       <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-8 mb-6 shadow-lg dark:from-slate-800 dark:to-slate-900">
         <h2 className="text-2xl font-bold text-slate-900 mb-6">Skin Health & Safety Score</h2>
+
+        {/* Image Overlay with Skin Condition Markers */}
+        <div className="mb-6">
+          <ImageOverlay 
+            analysis={analysis} 
+            imageData={imageData} 
+            className="w-full"
+          />
+        </div>
 
         <div className="flex items-center justify-between mb-8">
           <div className="flex-1">

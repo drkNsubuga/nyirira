@@ -10,6 +10,12 @@
 - ✅ Mobile-responsive design (Tailwind CSS)
 - ✅ Error handling (permissions, file size, timeouts)
 
+### Image Preview & Overlay Features
+- ✅ Image preview with confirmation (FR1.4)
+  - [x] Show captured/uploaded image before analysis
+  - [x] Allow user to confirm or retake the image
+  - [ ] Add image quality indicator (blur, lighting, composition)
+
 ### Infrastructure
 - ✅ Next.js 16+ (App Router)
 - ✅ TypeScript strict mode
@@ -52,6 +58,44 @@
 - Response time < 10 seconds typical
 - Graceful fallback if API unavailable
 - All E2E tests pass
+
+---
+
+## New Features - Image Overlays & Enhanced History (Q4 2026)
+
+### Image Overlay Markers (FR2.4)
+- [ ] Create ImageOverlay component for analysis results
+  - [ ] Implement spot detection markers with tooltips
+  - [ ] Add color-coded texture/redness overlays
+  - [ ] Make overlays interactive (tap for details)
+  - [ ] Test overlay accuracy with mock data
+
+- [ ] Enhance image preview quality
+  - [ ] Add blur detection algorithm
+  - [ ] Evaluate lighting conditions
+  - [ ] Check composition and framing
+  - [ ] Display quality score and recommendations
+
+### Enhanced History Comparison (FR4.3)
+- [ ] Update HistoryCompare to show side-by-side images
+  - [ ] Add overlay markers for condition changes
+  - [ ] Visual health score indicators (arrows, colors)
+  - [ ] Date comparison formatting
+  - [ ] Export comparison results
+
+- [ ] Visual history comparison features
+  - [ ] Side-by-side image comparison in history
+  - [ ] Overlay markers showing condition changes over time
+  - [ ] Health score visual indicators (trend arrows, colors)
+  - [ ] Date comparison formatting
+  - [ ] Export comparison results
+
+### Acceptance Criteria
+- Image overlays accurately display detected skin conditions
+- Interactive tooltips provide detailed condition information
+- History comparison shows visual improvements/declines
+- All overlay features work on mobile and desktop
+- Image quality indicators provide actionable feedback
 
 ---
 

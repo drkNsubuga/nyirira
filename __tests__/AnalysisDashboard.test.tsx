@@ -48,24 +48,24 @@ const sampleAnalysis: AnalysisResponse = {
 
 describe('AnalysisDashboard', () => {
   it('renders the health score', () => {
-    render(<AnalysisDashboard analysis={sampleAnalysis} onBack={() => {}} />);
+    render(<AnalysisDashboard analysis={sampleAnalysis} onBack={() => {}} imageData="test-image-data" />);
     expect(screen.getByText('72')).toBeInTheDocument();
   });
 
   it('renders safety flags and recommendations', () => {
-    render(<AnalysisDashboard analysis={sampleAnalysis} onBack={() => {}} />);
+    render(<AnalysisDashboard analysis={sampleAnalysis} onBack={() => {}} imageData="test-image-data" />);
     expect(screen.getByText('Avoid Bleaching Agents')).toBeInTheDocument();
     expect(screen.getByText(/niacinamide and daily sunscreen/i)).toBeInTheDocument();
   });
 
   it('renders the barrier repair regimen with East African availability notes', () => {
-    render(<AnalysisDashboard analysis={sampleAnalysis} onBack={() => {}} />);
+    render(<AnalysisDashboard analysis={sampleAnalysis} onBack={() => {}} imageData="test-image-data" />);
     expect(screen.getByText('Niacinamide Serum')).toBeInTheDocument();
     expect(screen.getByText(/East African pharmacies/i)).toBeInTheDocument();
   });
 
   it('renders recommended lip shades and the color palette', () => {
-    render(<AnalysisDashboard analysis={sampleAnalysis} onBack={() => {}} />);
+    render(<AnalysisDashboard analysis={sampleAnalysis} onBack={() => {}} imageData="test-image-data" />);
     expect(screen.getByText('Terracotta')).toBeInTheDocument();
     expect(screen.getByText('Plum')).toBeInTheDocument();
     expect(screen.getByText('Kitenge-inspired')).toBeInTheDocument();
@@ -73,7 +73,7 @@ describe('AnalysisDashboard', () => {
 
   it('persists to localStorage and calls onSaved when Save is clicked', () => {
     const onSaved = jest.fn();
-    render(<AnalysisDashboard analysis={sampleAnalysis} onBack={() => {}} onSaved={onSaved} />);
+    render(<AnalysisDashboard analysis={sampleAnalysis} onBack={() => {}} onSaved={onSaved} imageData="test-image-data" />);
 
     fireEvent.click(screen.getByText('Save Results'));
 
