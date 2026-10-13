@@ -25,11 +25,14 @@ const customJestConfig = {
     '!**/coverage/**',
   ],
   coverageThreshold: {
+    // Floor set to enforce the SRS NF5.2 target (>70% coverage) without
+    // being so strict that small refactors flake. Current: ~72% stmts / 74%
+    // lines / 72% funcs / 52% branches.
     global: {
-      branches: 5,
-      functions: 15,
-      lines: 15,
-      statements: 14,
+      branches: 45,
+      functions: 68,
+      lines: 70,
+      statements: 68,
     },
   },
 };

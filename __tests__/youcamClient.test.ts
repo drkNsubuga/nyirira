@@ -1,4 +1,5 @@
-import { analyzeImage } from '@/lib/youcamClient';
+import { analyzeImage, shouldUseRealApi } from '@/lib/youcamClient';
+import { defaultSettings, saveAppSettings } from '@/lib/storage';
 
 describe('youcamClient', () => {
   describe('analyzeImage', () => {
@@ -92,3 +93,40 @@ describe('youcamClient', () => {
     });
   });
 });
+
+describe('shouldUseRealApi', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('is false by default (no settings, no env)', () => {
+    expect(shouldUseRealApi()).toBe(false);
+  });
+
+  it('is true when settings enable the live API', () => {
+    saveAppSettings({ ...defaultSettings, useRealAPI: true });
+    expect(shouldUseRealApi()).toBe(true);
+  });
+});
+
+describe('analyzeImage real API path', () => {
+  const testImageData = 'data:image/jpeg;base64,AAAA';
+
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('surfaces a user-facing error when the live API fails', async () => {
+    saveAppSettings({ ...defaultSettings, useRealAPI: true });
+
+    // Fail every fetch attempt so the retry loop exhausts and throws.
+    global.fetch = jest.fn().mockRejectedValue(new Error('network down')) as never;
+
+    await expect(analyzeImage(testImageData)).rejects.toThrow(/disable the live API in Settings/i);
+  });
+});
+

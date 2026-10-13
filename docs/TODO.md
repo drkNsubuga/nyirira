@@ -36,10 +36,10 @@
   - [ ] Add request/response logging for debugging
   - [ ] Handle API rate limits & throttling
 
-- [ ] Enhance error handling
-  - [ ] Retry logic with exponential backoff
-  - [ ] API timeout handling (5-30s)
-  - [ ] Clear user-facing error messages for API failures
+- [x] Enhance error handling
+  - [x] Retry logic with exponential backoff
+  - [x] API timeout handling (5-30s)
+  - [x] Clear user-facing error messages for API failures
   - [ ] Fallback to mocked data if API unavailable
 
 - [ ] Testing
@@ -75,11 +75,11 @@
   - [ ] Protected routes
   - [ ] User profile page
 
-- [ ] Analysis history
-  - [ ] List previous analyses with thumbnails
-  - [ ] View past results
-  - [ ] Compare analyses over time
-  - [ ] Export analysis to PDF/image
+- [x] Analysis history
+  - [x] List previous analyses with thumbnails
+  - [x] View past results
+  - [x] Compare analyses over time
+  - [x] Export analysis to PDF/image
 
 ### Acceptance Criteria
 - User can create account & login
@@ -234,7 +234,7 @@
 - [ ] Accessibility audit (WCAG 2.1 AAA)
 
 ### Features (Lower Priority)
-- [ ] Dark mode toggle
+- [x] Dark mode toggle
 - [ ] Social sharing (Instagram, TikTok)
 - [ ] User-generated content (before/after galleries)
 - [ ] Influencer partnerships
@@ -269,12 +269,12 @@
 ## Testing & QA Strategy
 
 ### Unit Testing
-- [ ] Complete 70% code coverage
-- [ ] Mock all external APIs
-- [ ] Test error scenarios
+- [x] Complete 70% code coverage
+- [x] Mock all external APIs
+- [x] Test error scenarios
 
 ### Integration Testing
-- [ ] Test component interactions
+- [x] Test component interactions
 - [ ] Test state flow (capture → processing → results)
 
 ### End-to-End Testing
@@ -284,7 +284,7 @@
 
 ### Performance Testing
 - [ ] Lighthouse audit > 90 in all categories
-- [ ] Image optimization (JPEG compression)
+- [x] Image optimization (JPEG compression)
 - [ ] Bundle size < 500KB (gzipped)
 
 ### Security Testing

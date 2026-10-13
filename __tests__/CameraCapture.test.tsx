@@ -53,4 +53,58 @@ describe('CameraCapture', () => {
 
     expect(await screen.findByText(/file too large/i)).toBeInTheDocument();
   });
+
+  it('rejects non-image files', async () => {
+    render(<CameraCapture onImageCapture={() => {}} />);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+    const pdf = new File(['%PDF'], 'doc.pdf', { type: 'application/pdf' });
+    fireEvent.change(fileInput, { target: { files: [pdf] } });
+
+    expect(await screen.findByText(/valid image file/i)).toBeInTheDocument();
+  });
+
+  it('shows a preview and analyzes when a valid image is uploaded', async () => {
+    const onImageCapture = jest.fn();
+    render(<CameraCapture onImageCapture={onImageCapture} />);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+    const good = new File(['bytes'], 'selfie.jpg', { type: 'image/jpeg' });
+    // jsdom FileReader emits onload asynchronously with the data URL.
+    fireEvent.change(fileInput, { target: { files: [good] } });
+
+    // Preview mode: Analyze + Retake buttons appear.
+    const analyzeButton = await screen.findByText('Analyze');
+    expect(screen.getByText('Retake')).toBeInTheDocument();
+
+    fireEvent.click(analyzeButton);
+    expect(onImageCapture).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns to camera mode when Retake is clicked', async () => {
+    render(<CameraCapture onImageCapture={() => {}} />);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+    const good = new File(['bytes'], 'selfie.jpg', { type: 'image/jpeg' });
+    fireEvent.change(fileInput, { target: { files: [good] } });
+
+    const retake = await screen.findByText('Retake');
+    fireEvent.click(retake);
+    // Back in camera mode: Capture + Cancel controls are present.
+    expect(await screen.findByText('Capture')).toBeInTheDocument();
+  });
+
+  it('shows a not-supported message when the camera is unavailable', async () => {
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        getUserMedia: jest.fn().mockRejectedValue(Object.assign(new Error('nope'), { name: 'NotSupportedError' })),
+      },
+      configurable: true,
+    });
+
+    render(<CameraCapture onImageCapture={() => {}} />);
+    fireEvent.click(screen.getByText('Take Photo'));
+
+    expect(await screen.findByText(/camera is not supported/i)).toBeInTheDocument();
+  });
 });
