@@ -124,6 +124,8 @@ To swap mocked responses for live YouCam API:
 1. Obtain YouCam API credentials:
    - `NEXT_PUBLIC_YOUCAM_API_KEY`
    - `NEXT_PUBLIC_YOUCAM_API_URL`
+   - `NEXT_PUBLIC_YOUCAM_SKIN_ENDPOINT` (optional, default: /api/skinAnalysis)
+   - `NEXT_PUBLIC_YOUCAM_VTO_ENDPOINT` (optional, default: /api/virtualTryOn)
 
 2. Set environment variables:
    ```bash
@@ -131,6 +133,8 @@ To swap mocked responses for live YouCam API:
    NEXT_PUBLIC_USE_REAL_API=true
    NEXT_PUBLIC_YOUCAM_API_KEY=your_api_key_here
    NEXT_PUBLIC_YOUCAM_API_URL=https://api.youcam.ai
+   NEXT_PUBLIC_YOUCAM_SKIN_ENDPOINT=/api/skinAnalysis
+   NEXT_PUBLIC_YOUCAM_VTO_ENDPOINT=/api/virtualTryOn
    ```
 
 3. Rebuild & deploy:
@@ -138,6 +142,8 @@ To swap mocked responses for live YouCam API:
    pnpm build
    pnpm start
    ```
+
+**Note:** If the live API fails (e.g., 404 error), the app will automatically fall back to the mock analysis to ensure a smooth user experience.
 
 ## Development
 

@@ -120,13 +120,19 @@ describe('analyzeImage real API path', () => {
     jest.restoreAllMocks();
   });
 
-  it('surfaces a user-facing error when the live API fails', async () => {
+  it('falls back to mock analysis when the live API fails', async () => {
     saveAppSettings({ ...defaultSettings, useRealAPI: true });
 
     // Fail every fetch attempt so the retry loop exhausts and throws.
     global.fetch = jest.fn().mockRejectedValue(new Error('network down')) as never;
 
-    await expect(analyzeImage(testImageData)).rejects.toThrow(/disable the live API in Settings/i);
+    const result = await analyzeImage(testImageData);
+
+    // Should return mock analysis instead of throwing
+    expect(result).toBeDefined();
+    expect(result.skinAnalysis).toBeDefined();
+    expect(result.skinAnalysis.healthScore).toBe(72);
+    expect(result.vto).toBeDefined();
   });
 });
 

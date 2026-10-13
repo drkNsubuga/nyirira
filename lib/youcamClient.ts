@@ -8,6 +8,10 @@ import { AnalysisResponse, SkinAnalysisResult, VTOResult } from './types';
 
 const ENV_REAL_API_ENABLED = process.env.NEXT_PUBLIC_USE_REAL_API === 'true';
 
+// Configurable API endpoints (can be overridden via environment variables)
+const SKIN_ANALYSIS_ENDPOINT = process.env.NEXT_PUBLIC_YOUCAM_SKIN_ENDPOINT ?? '/api/skinAnalysis';
+const VTO_ENDPOINT = process.env.NEXT_PUBLIC_YOUCAM_VTO_ENDPOINT ?? '/api/virtualTryOn';
+
 export function shouldUseRealApi(): boolean {
   if (typeof window !== 'undefined') {
     try {
@@ -192,6 +196,7 @@ function getMockVTOResult(): VTOResult {
 /**
  * Analyze image from camera/upload
  * Returns mocked or real API response based on configuration
+ * Automatically falls back to mock analysis if live API fails
  */
 export async function analyzeImage(imageData: string): Promise<AnalysisResponse> {
   // Validate input
@@ -199,25 +204,8 @@ export async function analyzeImage(imageData: string): Promise<AnalysisResponse>
     throw new Error('Invalid image data');
   }
 
-  // In production with real API flag, call actual endpoint
-  if (shouldUseRealApi()) {
-    try {
-      return await callRealYouCamAPI(imageData);
-    } catch (error) {
-      // Surface the failure instead of silently showing mocked data, which
-      // would mislead the user into thinking the live analysis succeeded.
-      const message =
-        error instanceof Error ? error.message : 'Live YouCam analysis failed unexpectedly.';
-      throw new Error(
-        `${message} Please check your connection or disable the live API in Settings to use the demo analysis.`
-      );
-    }
-  }
-
-  // Simulate API processing delay
-  await new Promise((resolve) => setTimeout(resolve, 2000));
-
-  return await getMockAnalysis(imageData);
+  // Use the fallback function which handles both real API and mock
+  return analyzeImageWithFallback(imageData);
 }
 
 async function fetchWithRetry(url: string, init: RequestInit, maxRetries = 2): Promise<Response> {
@@ -259,7 +247,7 @@ async function callRealYouCamAPI(imageData: string): Promise<AnalysisResponse> {
   }
 
   try {
-    const skinResponse = await fetchWithRetry(`${baseUrl}/api/skinAnalysis`, {
+    const skinResponse = await fetchWithRetry(`${baseUrl}${SKIN_ANALYSIS_ENDPOINT}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -277,7 +265,7 @@ async function callRealYouCamAPI(imageData: string): Promise<AnalysisResponse> {
 
     const skinData = await skinResponse.json();
 
-    const vtoResponse = await fetchWithRetry(`${baseUrl}/api/virtualTryOn`, {
+    const vtoResponse = await fetchWithRetry(`${baseUrl}${VTO_ENDPOINT}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -308,6 +296,22 @@ async function callRealYouCamAPI(imageData: string): Promise<AnalysisResponse> {
     console.error('Real API call failed:', error);
     throw error;
   }
+}
+
+/**
+ * Analyze image with automatic fallback to mock analysis if live API fails
+ */
+export async function analyzeImageWithFallback(imageData: string): Promise<AnalysisResponse> {
+  if (shouldUseRealApi()) {
+    try {
+      return await callRealYouCamAPI(imageData);
+    } catch (error) {
+      console.warn('Live API failed, falling back to mock analysis:', error);
+      // Fall back to mock analysis
+      return getMockAnalysis(imageData);
+    }
+  }
+  return getMockAnalysis(imageData);
 }
 
 /**

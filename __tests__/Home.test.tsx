@@ -50,8 +50,10 @@ describe('Home page', () => {
   it('restores saved results when an analysis exists in storage', () => {
     saveAnalysis(makeAnalysis(81));
     render(<Home />);
-    // Dashboard renders the stored health score.
-    expect(screen.getByText('81')).toBeInTheDocument();
+    // Dashboard renders the stored health score in the main score card.
+    expect(screen.getByText(/Health Score/i)).toBeInTheDocument();
+    // Use getAllByText and check the first one (main score card)
+    expect(screen.getAllByText('81')[0]).toBeInTheDocument();
     // Export + Share actions are available on the results view.
     expect(screen.getByText('Export image')).toBeInTheDocument();
   });
