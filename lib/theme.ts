@@ -8,7 +8,7 @@
 
 export type ThemePreference = 'light' | 'dark';
 
-const THEME_KEY = 'nyirira_theme';
+export const THEME_KEY = 'nyirira_theme';
 
 export function applyTheme(theme: ThemePreference): void {
   if (typeof document === 'undefined') return;
@@ -34,6 +34,9 @@ export function setStoredTheme(theme: ThemePreference): void {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(THEME_KEY, theme);
+    // Same-tab subscribers (useSyncExternalStore) need a local notification;
+    // the native 'storage' event only fires in other tabs.
+    window.dispatchEvent(new Event('nyirira-storage'));
   } catch {
     // Ignore storage failures — theme still applies for the session.
   }

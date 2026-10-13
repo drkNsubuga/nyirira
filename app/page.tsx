@@ -1,14 +1,24 @@
 "use client";
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { AlertCircle, Clock3, Download, Loader2, Share2, Settings, Sparkles } from 'lucide-react';
 import CameraCapture from '@/components/CameraCapture';
 import AnalysisDashboard from '@/components/AnalysisDashboard';
 import HistoryCompare from '@/components/HistoryCompare';
 import Toast, { ToastMessage } from '@/components/Toast';
 import { AppState } from '@/lib/types';
-import { ANALYSIS_KEY, addAnalysisToHistory, getAnalysisHistory, getAppSettings } from '@/lib/storage';
+import {
+  ANALYSIS_KEY,
+  HISTORY_KEY,
+  SETTINGS_KEY,
+  addAnalysisToHistory,
+  parseAnalysis,
+  parseHistory,
+  parseSettings,
+  saveAnalysis,
+} from '@/lib/storage';
+import { useLocalStorageValue } from '@/lib/useLocalStorage';
 import { analyzeImage } from '@/lib/youcamClient';
 import { compressImage } from '@/lib/image';
 import { exportResultAsPng } from '@/lib/export';
@@ -22,39 +32,33 @@ const defaultState: AppState = {
 };
 
 export default function Home() {
-  const [state, setState] = useState<AppState>(() => {
-    if (typeof window === 'undefined') {
-      return defaultState;
-    }
+  // localStorage is read via useSyncExternalStore (see lib/useLocalStorage):
+  // getServerSnapshot returns null during SSR and hydration, so the
+  // server-rendered markup always matches the client's hydration render —
+  // no hydration mismatch — and React re-renders with the stored values right
+  // after hydration without a manual setState-in-effect.
+  const storedAnalysis = parseAnalysis(useLocalStorageValue(ANALYSIS_KEY));
+  const history = parseHistory(useLocalStorageValue(HISTORY_KEY));
+  const settings = parseSettings(useLocalStorageValue(SETTINGS_KEY));
 
-    try {
-      const saved = window.localStorage.getItem(ANALYSIS_KEY);
-      if (!saved) {
-        return defaultState;
-      }
-
-      return {
-        ...defaultState,
-        step: 'results',
-        analysis: JSON.parse(saved),
-      };
-    } catch {
-      return defaultState;
-    }
-  });
-
-  const history = useMemo(() => getAnalysisHistory(), []);
-  const settings = useMemo(() => getAppSettings(), []);
+  // Interactive state (capture/processing/results) stays in useState; the
+  // restored analysis is only used until the user explicitly starts over.
+  const [state, setState] = useState<AppState>(defaultState);
+  const [restored, setRestored] = useState(true);
   const [toast, setToast] = useState<ToastMessage | null>(null);
+
+  const analysis = state.analysis ?? (restored ? storedAnalysis : null);
+  const viewStep: AppState['step'] =
+    state.step === 'capture' && analysis ? 'results' : state.step;
 
   const showToast = (variant: ToastMessage['variant'], text: string) => {
     setToast({ id: Date.now(), variant, text });
   };
 
   const handleShare = async () => {
-    if (!state.analysis || !settings.enableSocialSharing) return;
+    if (!analysis || !settings.enableSocialSharing) return;
 
-    const shareText = `My Nyirira skin score is ${state.analysis.skinAnalysis.healthScore}/100. Safe skincare starts with hydration, barrier repair, and sun protection.`;
+    const shareText = `My Nyirira skin score is ${analysis.skinAnalysis.healthScore}/100. Safe skincare starts with hydration, barrier repair, and sun protection.`;
 
     try {
       if (navigator.share) {
@@ -76,8 +80,8 @@ export default function Home() {
   };
 
   const handleExport = () => {
-    if (!state.analysis) return;
-    exportResultAsPng(state.analysis);
+    if (!analysis) return;
+    exportResultAsPng(analysis);
     showToast('success', 'Results image downloaded');
   };
 
@@ -95,23 +99,21 @@ export default function Home() {
       // blow past the localStorage quota (SRS NF1.4 + FR4.1).
       const compressed = await compressImage(imageData);
 
-      const analysis = await analyzeImage(compressed);
+      const result = await analyzeImage(compressed);
       const item = {
         id: Date.now().toString(),
         createdAt: new Date().toISOString(),
-        summary: `Skin score ${analysis.skinAnalysis.healthScore}/100`,
+        summary: `Skin score ${result.skinAnalysis.healthScore}/100`,
         imageData: compressed,
-        analysis,
+        analysis: result,
       };
 
       addAnalysisToHistory(item);
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(ANALYSIS_KEY, JSON.stringify(analysis));
-      }
+      saveAnalysis(result);
 
       setState((prev) => ({
         ...prev,
-        analysis,
+        analysis: result,
         step: 'results',
         isLoading: false,
       }));
@@ -128,6 +130,7 @@ export default function Home() {
   };
 
   const handleBack = () => {
+    setRestored(false);
     setState({
       step: 'capture',
       imageData: null,
@@ -163,23 +166,23 @@ export default function Home() {
             <div className="flex items-center justify-between">
               <div
                 className={`flex-1 h-2 rounded-full ${
-                  state.step === 'capture' ? 'bg-emerald-600' : 'bg-emerald-200'
+                  viewStep === 'capture' ? 'bg-emerald-600' : 'bg-emerald-200'
                 }`}
               />
               <div className="px-4 text-center">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${
-                    ['capture', 'processing', 'results'].indexOf(state.step) >= 1
+                    ['capture', 'processing', 'results'].indexOf(viewStep) >= 1
                       ? 'bg-emerald-600'
                       : 'bg-slate-300'
                   }`}
                 >
-                  {state.step === 'capture' ? '1' : '✓'}
+                  {viewStep === 'capture' ? '1' : '✓'}
                 </div>
               </div>
               <div
                 className={`flex-1 h-2 rounded-full ${
-                  state.step === 'processing' || state.step === 'results'
+                  viewStep === 'processing' || viewStep === 'results'
                     ? 'bg-emerald-600'
                     : 'bg-emerald-200'
                 }`}
@@ -187,15 +190,15 @@ export default function Home() {
               <div className="px-4 text-center">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${
-                    state.step === 'results' ? 'bg-emerald-600' : 'bg-slate-300'
+                    viewStep === 'results' ? 'bg-emerald-600' : 'bg-slate-300'
                   }`}
                 >
-                  {state.step === 'results' ? '✓' : '2'}
+                  {viewStep === 'results' ? '✓' : '2'}
                 </div>
               </div>
               <div
                 className={`flex-1 h-2 rounded-full ${
-                  state.step === 'results' ? 'bg-emerald-600' : 'bg-emerald-200'
+                  viewStep === 'results' ? 'bg-emerald-600' : 'bg-emerald-200'
                 }`}
               />
             </div>
@@ -217,9 +220,9 @@ export default function Home() {
             </div>
           )}
 
-          {state.step === 'capture' && <CameraCapture onImageCapture={handleImageCapture} />}
+          {viewStep === 'capture' && <CameraCapture onImageCapture={handleImageCapture} />}
 
-          {state.step === 'processing' && (
+          {viewStep === 'processing' && (
             <div className="flex flex-col items-center justify-center py-12">
               <div className="mb-6">
                 <Loader2 className="w-12 h-12 text-emerald-600 animate-spin" />
@@ -245,7 +248,7 @@ export default function Home() {
             </div>
           )}
 
-          {state.step === 'results' && state.analysis && (
+          {viewStep === 'results' && analysis && (
             <div className="space-y-6">
               <div className="flex justify-end gap-2">
                 <button
@@ -268,17 +271,17 @@ export default function Home() {
                 )}
               </div>
 
-              <HistoryCompare current={state.analysis} history={history} />
+              <HistoryCompare current={analysis} history={history} />
 
               <AnalysisDashboard
-                analysis={state.analysis}
+                analysis={analysis}
                 onBack={handleBack}
                 onSaved={() => showToast('success', 'Results saved to this device')}
               />
             </div>
           )}
 
-          {history.length > 0 && state.step === 'capture' && (
+          {history.length > 0 && viewStep === 'capture' && (
             <section className="mt-10 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-center gap-2 mb-4">
                 <Clock3 className="w-4 h-4 text-slate-600" />

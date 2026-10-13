@@ -1,24 +1,25 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
 import { ArrowLeft, Check, Globe, Moon, ShieldCheck, Sparkles, Sun } from 'lucide-react';
-import { AppSettings, getAppSettings, saveAppSettings } from '@/lib/storage';
-import { applyTheme, getStoredTheme, setStoredTheme, type ThemePreference } from '@/lib/theme';
+import { AppSettings, SETTINGS_KEY, parseSettings, saveAppSettings } from '@/lib/storage';
+import { useLocalStorageValue } from '@/lib/useLocalStorage';
+import { THEME_KEY, applyTheme, setStoredTheme, type ThemePreference } from '@/lib/theme';
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<AppSettings>(() => getAppSettings());
-  const [theme, setTheme] = useState<ThemePreference>(() => getStoredTheme());
+  // Read via useSyncExternalStore so SSR/hydration markup always matches and
+  // values refresh from localStorage without a setState-in-effect (same
+  // approach as the Home page). Writes go through save* helpers, which notify
+  // subscribers so this component re-renders with the new values.
+  const settings = parseSettings(useLocalStorageValue(SETTINGS_KEY));
+  const theme: ThemePreference = useLocalStorageValue(THEME_KEY) === 'dark' ? 'dark' : 'light';
 
   const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
-    const next = { ...settings, [key]: value };
-    setSettings(next);
-    saveAppSettings(next);
+    saveAppSettings({ ...settings, [key]: value });
   };
 
   const toggleTheme = () => {
     const next: ThemePreference = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
     setStoredTheme(next);
     applyTheme(next);
   };
