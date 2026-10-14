@@ -22,7 +22,13 @@ Nyirira is a mobile-responsive single-page web application built for the Ugandan
 - **Barrier Repair Regimen**: Curated list of ingredients common in East African pharmacies (glycerin, niacinamide, natural oils)
 - **Harmonized Look**: Virtual makeup + outfit color suggestions paired with warm color undertones
 
-### 4. Client-Side Data Persistence
+### 4. Client-Side Validation & Error Handling
+- **Pre-submission checks**: File size, resolution, face detection, quality analysis, orientation (portrait selfies allowed; only extreme aspect ratios rejected)
+- **ML-powered validation**: TensorFlow.js face detection, Tesseract.js privacy checks
+- **Offline error processing**: Comprehensive error code mapping with fallback messages
+- **Real-time feedback**: Validation progress indicators and specific guidance
+
+### 5. Client-Side Data Persistence
 - Results saved to browser localStorage
 - No backend database required (MVP cost-optimization)
 - Privacy-first: images analyzed locally, no server storage
@@ -34,6 +40,7 @@ Nyirira is a mobile-responsive single-page web application built for the Ugandan
 - **Icons**: Lucide React
 - **State Management**: React `useState` + `localStorage`
 - **API Integration**: YouCam REST endpoints (mocked for MVP, togglable to live)
+- **ML Libraries**: TensorFlow.js, Tesseract.js
 - **Testing**: Jest + React Testing Library
 - **Package Manager**: pnpm
 
@@ -72,6 +79,8 @@ nyirira/
 ├── lib/
 │   ├── types.ts                    # TypeScript type definitions
 │   ├── youcamClient.ts             # API client (mocked + live toggle)
+│   ├── imageValidation.ts          # Client-side validation
+│   └── advancedValidation.ts       # ML-powered validation
 ├── docs/
 │   ├── SRS.md                      # Software Requirements Spec
 │   ├── TODO.md                     # Development roadmap

@@ -6,6 +6,7 @@ import { AnalysisResponse } from '@/lib/types';
 import { analyzeImage } from '@/lib/youcamClient';
 import { compressImage } from '@/lib/image';
 import { validateImageResolution } from '@/lib/imageValidation';
+import { runFullImageValidation } from '@/lib/advancedValidation';
 
 jest.mock('@/lib/youcamClient', () => ({
   analyzeImage: jest.fn(),
@@ -18,6 +19,10 @@ jest.mock('@/lib/image', () => ({
 jest.mock('@/lib/imageValidation', () => ({
   validateImageResolution: jest.fn().mockResolvedValue({ valid: true }),
   validateImageFile: jest.fn().mockReturnValue({ valid: true }),
+}));
+
+jest.mock('@/lib/advancedValidation', () => ({
+  runFullImageValidation: jest.fn().mockResolvedValue({ valid: true }),
 }));
 
 function makeAnalysis(score = 72, ts = '2026-10-12T10:00:00.000Z'): AnalysisResponse {
@@ -108,7 +113,8 @@ describe('Home page', () => {
     fireEvent.click(analyzeButton);
 
     // Alert with the friendly message replaces the raw API error.
-    expect(await screen.findByText(/turned or tilted too far/i)).toBeInTheDocument();
+    await screen.findByText('Analysis Error');
+    expect(screen.getByText(/Your face is turned or tilted too far/i)).toBeInTheDocument();
     // The failed photo is shown back to the user.
     expect(screen.getByAltText('Photo that failed analysis')).toBeInTheDocument();
     // Retry and take-new-photo options are available.
@@ -120,7 +126,7 @@ describe('Home page', () => {
 
   it('shows the validation error and skips analysis when the image fails pre-flight checks', async () => {
     (analyzeImage as jest.Mock).mockClear();
-    (validateImageResolution as jest.Mock).mockResolvedValueOnce({
+    (runFullImageValidation as jest.Mock).mockResolvedValueOnce({
       valid: false,
       message: 'Image resolution too low (320×240px). The short side must be at least 480px.',
     });
@@ -132,7 +138,8 @@ describe('Home page', () => {
 
     fireEvent.click(await screen.findByText('Analyze'));
 
-    expect(await screen.findByText(/resolution too low/i)).toBeInTheDocument();
+    await screen.findByText('Analysis Error');
+    expect(screen.getByText(/Image resolution too low/i)).toBeInTheDocument();
     expect(screen.getByAltText('Photo that failed analysis')).toBeInTheDocument();
     // Analysis must never be attempted for an invalid image.
     expect(analyzeImage).not.toHaveBeenCalled();
@@ -149,7 +156,8 @@ describe('Home page', () => {
     fireEvent.change(fileInput, { target: { files: [file] } });
 
     fireEvent.click(await screen.findByText('Analyze'));
-    await screen.findByText(/too low-resolution/i);
+    await screen.findByText('Analysis Error');
+    expect(screen.getByText(/too low-resolution/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Take new photo'));
 

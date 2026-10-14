@@ -38,24 +38,143 @@ const defaultState: AppState = {
 /**
  * Map raw YouCam API error codes to user-friendly guidance.
  * See https://docs.perfectcorp.com (error codes).
+ * All error handling is done offline for reliability.
  */
 function friendlyApiError(message: string): string {
   const code = message.match(/error_[a-z_]+/)?.[0];
+  const jsonError = message.match(/\{[^}]*\}/)?.[0];
+  
+  // Try to parse JSON error payload
+  let errorData: { error?: string; error_message?: string } | null = null;
+  if (jsonError) {
+    try {
+      errorData = JSON.parse(jsonError);
+    } catch {
+      // Invalid JSON, continue with string matching
+    }
+  }
+
+  // Use error from JSON payload if available
+  const errorCode = errorData?.error || code;
+
+  // Network / connectivity failures: only reachable on the results step (the
+  // live API fetch). Report a friendly, actionable message instead of the raw
+  // browser "NetworkError when attempting to fetch resource."
+  const normalized = message.toLowerCase();
+  if (
+    normalized.includes('networkerror') ||
+    normalized.includes('failed to fetch') ||
+    normalized.includes('network request failed') ||
+    normalized.includes('load failed') ||
+    normalized.includes('err_internet_disconnected') ||
+    normalized.includes('the internet connection appears to be offline')
+  ) {
+    return 'You appear to be offline. Check your internet connection and try again.';
+  }
+  if (normalized.includes('timeout') || normalized.includes('timed out') || normalized.includes('aborted')) {
+    return 'The analysis took too long and timed out. Please try again with a different photo.';
+  }
+
   const messages: Record<string, string> = {
+    // Face position and orientation errors
     error_large_face_angle:
       'Your face is turned or tilted too far. Look straight at the camera and keep your head upright.',
+    error_face_angle_invalid:
+      'Keep your head straight — front-facing photos need your head within about 10°.',
+    error_face_position_invalid:
+      'Make sure your entire face is fully visible in the frame.',
+    error_face_position_too_small:
+      'Your face is too small. Move closer to the camera.',
+    error_face_position_out_of_boundary:
+      'Your face is too large or partly outside the frame. Adjust your position and retake.',
+    error_multiple_faces:
+      'Multiple faces detected. Ensure only one person is in the frame and try again.',
+    
+    // Image quality and size errors
     error_below_min_image_size:
       'The image is too low-resolution. Move closer to the camera or upload a larger photo.',
     error_exceed_max_image_size: 'The image is too large. Upload a smaller photo.',
-    error_face_position_invalid: 'Make sure your entire face is fully visible in the frame.',
-    error_face_position_too_small: 'Your face is too small. Move closer to the camera.',
-    error_face_position_out_of_boundary:
-      'Your face is too large or partly outside the frame. Adjust your position and retake.',
-    error_face_angle_invalid:
-      'Keep your head straight — front-facing photos need your head within about 10°.',
+    error_image_too_small:
+      'The image dimensions are too small. Please upload a larger photo.',
+    error_image_too_large:
+      'The image dimensions are too large. Please upload a smaller photo.',
+    error_invalid_image_format:
+      'Invalid image format. Please upload a JPG or PNG image.',
+    error_corrupted_image:
+      'The image appears to be corrupted or damaged. Please try another photo.',
+    
+    // Lighting and quality errors
+    error_poor_lighting:
+      'Poor lighting detected. Ensure you\'re in a well-lit area and face the light source.',
+    error_excessive_brightness:
+      'The image is too bright. Move away from bright lights and try again.',
+    error_excessive_darkness:
+      'The image is too dark. Ensure proper lighting and try again.',
+    error_blurry_image:
+      'The image is blurry. Hold your camera steady and take a clear photo.',
+    error_low_contrast:
+      'Low contrast detected. Ensure good lighting and clear focus.',
+    
+    // Privacy and content errors
+    error_sensitive_content_detected:
+      'Sensitive content detected. Please ensure the image contains only your face.',
+    error_inappropriate_content:
+      'Inappropriate content detected. Please upload a suitable photo.',
+    error_person_not_visible:
+      'No person detected in the image. Please include a person in the frame.',
+    
+    // API and technical errors
+    error_api_timeout:
+      'The analysis took too long. Please try again with a different image.',
+    error_api_internal_error:
+      'A server error occurred. Please try again later.',
+    error_api_rate_limit:
+      'Too many requests. Please wait a moment and try again.',
+    error_api_unauthorized:
+      'Authentication error. Please check your API configuration.',
+    error_api_forbidden:
+      'Access denied. Please check your API permissions.',
+    error_api_not_found:
+      'Service not available. Please try again later.',
+    
+    // Default fallbacks
+    error_unknown_error:
+      'Unable to analyze the image. Please try a different photo.',
+    error_default:
+      'The selected image cannot be analyzed. Please try another photo.',
   };
-  if (code && messages[code]) return messages[code];
-  return message;
+
+  // Return specific error message if we have a matching code
+  if (errorCode && messages[errorCode]) {
+    return messages[errorCode];
+  }
+
+  // Handle JSON error messages without specific codes
+  if (errorData?.error_message) {
+    // Check for common patterns in error messages
+    const errorMsg = errorData.error_message.toLowerCase();
+    if (errorMsg.includes('too small') || errorMsg.includes('resolution')) {
+      return 'The image is too low-resolution. Move closer to the camera or upload a larger photo.';
+    }
+    if (errorMsg.includes('too large')) {
+      return 'The image is too large. Upload a smaller photo.';
+    }
+    if (errorMsg.includes('face') && (errorMsg.includes('angle') || errorMsg.includes('tilt'))) {
+      return 'Your face is turned or tilted too far. Look straight at the camera and keep your head upright.';
+    }
+    if (errorMsg.includes('position')) {
+      return 'Make sure your entire face is fully visible in the frame.';
+    }
+    if (errorMsg.includes('blur')) {
+      return 'The image is blurry. Hold your camera steady and take a clear photo.';
+    }
+    if (errorMsg.includes('light')) {
+      return 'Poor lighting detected. Ensure you\'re in a well-lit area and face the light source.';
+    }
+  }
+
+  // Fallback to original message or generic error
+  return message || 'Unable to analyze the image. Please try a different photo.';
 }
 
 export default function Home() {

@@ -435,38 +435,37 @@ export async function analyzeImageWithFallback(imageData: string): Promise<Analy
 }
 
 /**
- * Transform raw YouCam skin analysis response to our format
+ * Transform raw YouCam skin analysis response to our format.
+ *
+ * NOTE: This runs only on the live-API path. When the real API omits a field we
+ * use NEUTRAL defaults (empty / zero) — never fabricated mock scores. Mock data
+ * must only ever be returned when USE_REAL_API is disabled.
  */
 function transformSkinData(rawData: Record<string, unknown>): SkinAnalysisResult {
-  const fallback = getMockSkinAnalysis();
-  if (!rawData || typeof rawData !== 'object') {
-    return fallback;
-  }
-
-  const healthScore = Number(rawData.healthScore ?? fallback.healthScore);
-  const spots = rawData.spots as Record<string, unknown> | undefined;
-  const texture = rawData.texture as Record<string, unknown> | undefined;
-  const redness = rawData.redness as Record<string, unknown> | undefined;
-  const safetyFlags = Array.isArray(rawData.safetyFlags) ? rawData.safetyFlags : fallback.safetyFlags;
-  const barrierRepairRegimen = Array.isArray(rawData.barrierRepairRegimen)
-    ? rawData.barrierRepairRegimen
-    : fallback.barrierRepairRegimen;
+  const spots = rawData?.spots as Record<string, unknown> | undefined;
+  const texture = rawData?.texture as Record<string, unknown> | undefined;
+  const redness = rawData?.redness as Record<string, unknown> | undefined;
+  const healthScore = Number(rawData?.healthScore);
+  const safetyFlags = Array.isArray(rawData?.safetyFlags) ? rawData!.safetyFlags : [];
+  const barrierRepairRegimen = Array.isArray(rawData?.barrierRepairRegimen)
+    ? rawData!.barrierRepairRegimen
+    : [];
 
   return {
-    healthScore: Number.isFinite(healthScore) ? healthScore : fallback.healthScore,
+    healthScore: Number.isFinite(healthScore) ? healthScore : 0,
     spots: {
-      count: Number(spots?.count ?? fallback.spots.count),
-      severity: (spots?.severity as 'mild' | 'moderate' | 'severe') ?? fallback.spots.severity,
-      description: String(spots?.description ?? fallback.spots.description),
+      count: Number(spots?.count) || 0,
+      severity: (spots?.severity as 'mild' | 'moderate' | 'severe') ?? 'mild',
+      description: String(spots?.description ?? ''),
     },
     texture: {
-      smoothness: Number(texture?.smoothness ?? fallback.texture.smoothness),
-      roughness: Number(texture?.roughness ?? fallback.texture.roughness),
-      description: String(texture?.description ?? fallback.texture.description),
+      smoothness: Number(texture?.smoothness) || 0,
+      roughness: Number(texture?.roughness) || 0,
+      description: String(texture?.description ?? ''),
     },
     redness: {
-      level: Number(redness?.level ?? fallback.redness.level),
-      description: String(redness?.description ?? fallback.redness.description),
+      level: Number(redness?.level) || 0,
+      description: String(redness?.description ?? ''),
     },
     safetyFlags: safetyFlags as SkinAnalysisResult['safetyFlags'],
     barrierRepairRegimen: barrierRepairRegimen as SkinAnalysisResult['barrierRepairRegimen'],
@@ -474,27 +473,25 @@ function transformSkinData(rawData: Record<string, unknown>): SkinAnalysisResult
 }
 
 /**
- * Transform raw YouCam VTO response to our format
+ * Transform raw YouCam VTO response to our format.
+ *
+ * NOTE: Runs only on the live-API path. Missing fields fall back to NEUTRAL
+ * (empty palette / empty shade list), never fabricated mock recommendations.
  */
 function transformVTOData(rawData: Record<string, unknown>): VTOResult {
-  const fallback = getMockVTOResult();
-  if (!rawData || typeof rawData !== 'object') {
-    return fallback;
-  }
-
-  const recommendedLipShades = Array.isArray(rawData.recommendedLipShades)
-    ? rawData.recommendedLipShades
-    : fallback.recommendedLipShades;
-  const outfitPalette = (rawData.outfitPalette as Record<string, unknown>) ?? fallback.outfitPalette;
+  const outfitPalette = (rawData?.outfitPalette as Record<string, unknown>) ?? {};
+  const recommendedLipShades = Array.isArray(rawData?.recommendedLipShades)
+    ? rawData!.recommendedLipShades
+    : [];
 
   return {
     recommendedLipShades: recommendedLipShades as VTOResult['recommendedLipShades'],
     outfitPalette: {
-      primary: String(outfitPalette.primary ?? fallback.outfitPalette.primary),
-      secondary: String(outfitPalette.secondary ?? fallback.outfitPalette.secondary),
-      accent: String(outfitPalette.accent ?? fallback.outfitPalette.accent),
-      inspiration: String(outfitPalette.inspiration ?? fallback.outfitPalette.inspiration),
+      primary: String(outfitPalette.primary ?? ''),
+      secondary: String(outfitPalette.secondary ?? ''),
+      accent: String(outfitPalette.accent ?? ''),
+      inspiration: String(outfitPalette.inspiration ?? ''),
     },
-    description: String(rawData.description ?? fallback.description),
+    description: String(rawData?.description ?? ''),
   };
 }

@@ -5,10 +5,50 @@
 import * as blazeface from '@tensorflow-models/blazeface';
 import * as tf from '@tensorflow/tfjs';
 
+/**
+ * True when the browser reports no connectivity. Network-dependent ML checks
+ * (blazeface / Tesseract download model weights + workers from a CDN) must be
+ * skipped offline so validation never surfaces a raw "NetworkError".
+ */
+function isOffline(): boolean {
+  return typeof navigator !== 'undefined' && navigator.onLine === false;
+}
+
+/**
+ * Load an image from a data URI with an onerror + timeout guard so callers
+ * never hang or throw (jsdom and offline browsers never fire onload reliably).
+ */
+function loadImage(dataUri: string, timeoutMs = 2000): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    if (typeof Image === 'undefined' || typeof document === 'undefined') {
+      resolve(null);
+      return;
+    }
+    const img = new Image();
+    let settled = false;
+    const settle = (value: HTMLImageElement | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
+    const timer = setTimeout(() => settle(null), timeoutMs);
+    img.onload = () => settle(img);
+    img.onerror = () => settle(null);
+    img.src = dataUri;
+  });
+}
+
 export async function detectFaceAndQuality(dataUri: string): Promise<{ valid: boolean; message?: string }> {
+  // Face detection requires downloading the blazeface model — skip offline and
+  // stay permissive (the server remains the source of truth for real analysis).
+  if (isOffline()) return { valid: true };
   try {
     const model = await blazeface.load();
-    const face = await model.estimateFaces(await createImageData(dataUri), false);
+    const canvas = await createImageData(dataUri);
+    if (!canvas) return { valid: true };
+    const face = await model.estimateFaces(canvas, false);
+
     
     if (face.length === 0) {
       return { valid: false, message: 'No face detected. Please ensure your face is clearly visible in the photo.' };
@@ -36,11 +76,10 @@ export async function detectFaceAndQuality(dataUri: string): Promise<{ valid: bo
   }
 }
 
-async function createImageData(dataUri: string): Promise<HTMLCanvasElement> {
-  const img = new Image();
-  img.src = dataUri;
-  await new Promise(resolve => { img.onload = resolve; });
-  
+async function createImageData(dataUri: string): Promise<HTMLCanvasElement | null> {
+  const img = await loadImage(dataUri);
+  if (!img || !img.width || !img.height || typeof document === 'undefined') return null;
+
   const canvas = document.createElement('canvas');
   canvas.width = img.width;
   canvas.height = img.height;
@@ -50,34 +89,18 @@ async function createImageData(dataUri: string): Promise<HTMLCanvasElement> {
 }
 
 async function readImageDimensions(dataUri: string): Promise<{ width: number; height: number } | null> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    let settled = false;
-    const settle = (value: { width: number; height: number } | null) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(value);
-    };
-    const timer = setTimeout(() => settle(null), 2000);
-    img.onload = () => settle({ width: img.naturalWidth, height: img.naturalHeight });
-    img.onerror = () => settle(null);
-    img.src = dataUri;
-  });
+  const img = await loadImage(dataUri);
+  if (!img || !img.naturalWidth) return null;
+  return { width: img.naturalWidth, height: img.naturalHeight };
 }
 
 export async function analyzeImageQuality(dataUri: string): Promise<{ valid: boolean; message?: string }> {
-  const img = new Image();
-  img.src = dataUri;
-  await new Promise(resolve => { img.onload = resolve; });
-  
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d')!;
-  canvas.width = img.width;
-  canvas.height = img.height;
-  ctx.drawImage(img, 0, 0);
-  
-  const imageData = ctx.getImageData(0, 0, img.width, img.height);
+  const canvas = await createImageData(dataUri);
+  if (!canvas) return { valid: true }; // Can't decode offline/in test — stay permissive.
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return { valid: true };
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imageData.data;
   
   // Blur detection
@@ -116,6 +139,9 @@ export async function analyzeImageQuality(dataUri: string): Promise<{ valid: boo
 }
 
 export async function checkPrivacyCompliance(dataUri: string): Promise<{ valid: boolean; message?: string }> {
+  // Tesseract downloads its WASM worker + language data from a CDN — skip when
+  // offline so validation never surfaces a raw "NetworkError".
+  if (isOffline()) return { valid: true };
   try {
     const Tesseract = (await import('tesseract.js')).default;
     
@@ -148,13 +174,17 @@ export async function checkPrivacyCompliance(dataUri: string): Promise<{ valid: 
 export async function checkOrientationAndPose(dataUri: string): Promise<{ valid: boolean; message?: string }> {
   const dims = await readImageDimensions(dataUri);
   if (!dims) return { valid: true };
-  
-  // Check if image is portrait (not landscape)
-  const isPortrait = dims.height > dims.width;
-  if (isPortrait) {
-    return { valid: false, message: 'Please rotate your device to landscape orientation.' };
+
+  // Portrait selfies are valid for face analysis — orientation alone is not
+  // disqualifying. Only reject extreme aspect ratios that crop the face badly.
+  const ratio = dims.height / dims.width;
+  if (ratio > 2.5 || ratio < 0.4) {
+    return {
+      valid: false,
+      message: 'Photo is too stretched. Take a standard upright selfie so your whole face fits.',
+    };
   }
-  
+
   return { valid: true };
 }
 
