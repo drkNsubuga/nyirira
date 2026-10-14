@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { Camera, Upload, AlertCircle } from 'lucide-react';
 import { CameraError } from '@/lib/types';
+import { validateImageFile } from '@/lib/imageValidation';
 
 interface CameraCaptureProps {
   onImageCapture: (imageData: string) => void;
@@ -86,19 +87,9 @@ export default function CameraCapture({ onImageCapture }: CameraCaptureProps) {
 
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      setError({
-        type: 'unknown',
-        message: `File too large. Maximum size is 10MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB.`,
-      });
-      return;
-    }
-
-    if (!file.type.startsWith('image/')) {
-      setError({
-        type: 'unknown',
-        message: 'Please select a valid image file (JPG, PNG, etc.)',
-      });
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      setError({ type: 'unknown', message: validation.message! });
       return;
     }
 

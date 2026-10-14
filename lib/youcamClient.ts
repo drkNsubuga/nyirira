@@ -6,8 +6,6 @@
 import { getAppSettings } from './storage';
 import { AnalysisResponse, SkinAnalysisResult, VTOResult } from './types';
 
-const ENV_REAL_API_ENABLED = process.env.NEXT_PUBLIC_USE_REAL_API === 'true';
-
 export function shouldUseRealApi(): boolean {
   if (typeof window !== 'undefined') {
     try {
@@ -20,7 +18,9 @@ export function shouldUseRealApi(): boolean {
     }
   }
 
-  return ENV_REAL_API_ENABLED;
+  // Read env dynamically (Next.js inlines NEXT_PUBLIC_* as literals in the
+  // browser bundle; tests can flip this at runtime).
+  return process.env.NEXT_PUBLIC_USE_REAL_API === 'true';
 }
 
 const ZERO_DIMENSIONS = { width: 0, height: 0 };
@@ -415,19 +415,20 @@ async function callRealYouCamAPI(imageData: string): Promise<AnalysisResponse> {
 }
 
 /**
- * Analyze image with automatic fallback to mock analysis if live API fails
+ * Analyze an image.
+ *
+ * When the live YouCam API is enabled, errors PROPAGATE so the UI can show
+ * the user-facing error alert (friendly message + retry options).
+ * Mock data is only used when the real API is not in use — a failed live
+ * analysis must never be silently presented as real results.
  */
 export async function analyzeImageWithFallback(imageData: string): Promise<AnalysisResponse> {
   if (shouldUseRealApi()) {
-    try {
-      return await callRealYouCamAPI(imageData);
-    } catch (error) {
-      console.warn('Live API failed, falling back to mock analysis:', error);
-      // Fall back to mock analysis
-      return getMockAnalysis(imageData);
-    }
+    // Errors intentionally bubble up — no silent fallback to mock data.
+    return callRealYouCamAPI(imageData);
   }
-  // Simulate API processing delay (SRS NF1.3)
+
+  // Mock path (real API disabled): simulate processing delay (SRS NF1.3).
   await new Promise((resolve) => setTimeout(resolve, 2000));
 
   return getMockAnalysis(imageData);

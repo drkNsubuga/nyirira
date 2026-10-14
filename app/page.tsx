@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { AlertCircle, Clock3, Download, Loader2, Share2, Settings, Sparkles } from 'lucide-react';
+import { AlertCircle, Camera, Clock3, Download, Loader2, RotateCcw, Share2, Settings, Sparkles } from 'lucide-react';
 import CameraCapture from '@/components/CameraCapture';
 import AnalysisDashboard from '@/components/AnalysisDashboard';
 import HistoryCompare from '@/components/HistoryCompare';
@@ -21,6 +21,7 @@ import {
 import { useLocalStorageValue } from '@/lib/useLocalStorage';
 import { analyzeImage } from '@/lib/youcamClient';
 import { compressImage } from '@/lib/image';
+import { validateImageResolution } from '@/lib/imageValidation';
 import { exportResultAsPng } from '@/lib/export';
 
 const defaultState: AppState = {
@@ -30,6 +31,29 @@ const defaultState: AppState = {
   error: null,
   isLoading: false,
 };
+
+/**
+ * Map raw YouCam API error codes to user-friendly guidance.
+ * See https://docs.perfectcorp.com (error codes).
+ */
+function friendlyApiError(message: string): string {
+  const code = message.match(/error_[a-z_]+/)?.[0];
+  const messages: Record<string, string> = {
+    error_large_face_angle:
+      'Your face is turned or tilted too far. Look straight at the camera and keep your head upright.',
+    error_below_min_image_size:
+      'The image is too low-resolution. Move closer to the camera or upload a larger photo.',
+    error_exceed_max_image_size: 'The image is too large. Upload a smaller photo.',
+    error_face_position_invalid: 'Make sure your entire face is fully visible in the frame.',
+    error_face_position_too_small: 'Your face is too small. Move closer to the camera.',
+    error_face_position_out_of_boundary:
+      'Your face is too large or partly outside the frame. Adjust your position and retake.',
+    error_face_angle_invalid:
+      'Keep your head straight — front-facing photos need your head within about 10°.',
+  };
+  if (code && messages[code]) return messages[code];
+  return message;
+}
 
 export default function Home() {
   // localStorage is read via useSyncExternalStore (see lib/useLocalStorage):
@@ -95,6 +119,21 @@ export default function Home() {
     }));
 
     try {
+      // Pre-flight validation (size, resolution) — fail fast with a friendly
+      // message instead of burning a real API task on a doomed image.
+      const validation = await validateImageResolution(imageData);
+      if (!validation.valid) {
+        setRestored(false);
+        setState((prev) => ({
+          ...prev,
+          error: validation.message ?? 'The selected image cannot be analyzed.',
+          step: 'capture',
+          isLoading: false,
+          // imageData already set above — kept so the user can retake/retry.
+        }));
+        return;
+      }
+
       // Compress/resize before analysis and storage so large uploads don't
       // blow past the localStorage quota (SRS NF1.4 + FR4.1).
       const compressed = await compressImage(imageData);
@@ -119,14 +158,27 @@ export default function Home() {
       }));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      // Drop the restored analysis so the error alert isn't masked by stale results.
+      setRestored(false);
       setState((prev) => ({
         ...prev,
-        error: errorMessage,
+        error: friendlyApiError(errorMessage),
         step: 'capture',
         isLoading: false,
-        imageData: null,
+        // Keep imageData so the user can retry the same photo or retake —
+        // the original image stays visible in the error alert.
       }));
     }
+  };
+
+  // Re-analyze the retained image (user adjusted position and wants another go).
+  const handleRetry = () => {
+    if (state.imageData) handleImageCapture(state.imageData);
+  };
+
+  // Discard the failed image and return to a fresh camera/upload flow.
+  const handleStartOver = () => {
+    setState({ ...defaultState });
   };
 
   const handleBack = () => {
@@ -210,17 +262,59 @@ export default function Home() {
             </div>
           </div>
 
-          {state.error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-red-900">Analysis Error</p>
-                <p className="text-red-800 text-sm">{state.error}</p>
+          {state.error && viewStep === 'capture' && (
+            <div
+              role="alert"
+              className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg dark:bg-red-950 dark:border-red-900"
+            >
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-red-900 dark:text-red-100">Analysis Error</p>
+                  <p className="text-red-800 text-sm dark:text-red-200">{state.error}</p>
+                </div>
               </div>
+
+              {/* Show the original image with retry / retake options */}
+              {state.imageData && (
+                <div className="mt-4 flex flex-col sm:flex-row items-start gap-4">
+                  <img
+                    src={state.imageData}
+                    alt="Photo that failed analysis"
+                    className="w-28 h-28 object-cover rounded-lg border border-red-200"
+                  />
+                  <div className="flex flex-col gap-2">
+                    <p className="text-sm text-red-800 dark:text-red-200">
+                      This photo couldn&apos;t be analyzed. Fix the issue above and try the same photo again,
+                      or take/upload a new one.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleRetry}
+                        disabled={state.isLoading}
+                        className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Try again
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleStartOver}
+                        disabled={state.isLoading}
+                        className="inline-flex items-center gap-2 rounded-full border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:bg-transparent dark:text-red-200 dark:border-red-800 dark:hover:bg-red-950"
+                      >
+                        <Camera className="w-4 h-4" />
+                        Take new photo
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {viewStep === 'capture' && <CameraCapture onImageCapture={handleImageCapture} />}
+          {viewStep === 'capture' && !state.error && <CameraCapture onImageCapture={handleImageCapture} />}
 
           {viewStep === 'processing' && (
             <div className="flex flex-col items-center justify-center py-12">
