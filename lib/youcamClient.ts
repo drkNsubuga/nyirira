@@ -311,6 +311,9 @@ export async function analyzeImageWithFallback(imageData: string): Promise<Analy
       return getMockAnalysis(imageData);
     }
   }
+  // Simulate API processing delay (SRS NF1.3)
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+
   return getMockAnalysis(imageData);
 }
 

@@ -294,7 +294,7 @@ export default function Home() {
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => setState({ ...defaultState, step: 'results', analysis: item.analysis })}
+                    onClick={() => setState({ ...defaultState, step: 'results', analysis: item.analysis, imageData: item.imageData })}
                     className="flex w-full items-center justify-between gap-4 rounded-xl border border-slate-200 p-3 text-left hover:border-emerald-200 hover:bg-emerald-50"
                   >
                     <div className="flex items-center gap-3">
