@@ -30,6 +30,7 @@ const defaultState: AppState = {
   imageData: null,
   analysis: null,
   error: null,
+  errorList: null,
   isLoading: false,
   validationProgress: 0,
   validationMessage: '',
@@ -250,6 +251,7 @@ export default function Home() {
       step: 'processing',
       isLoading: true,
       error: null,
+      errorList: null,
     }));
 
     try {
@@ -266,9 +268,13 @@ export default function Home() {
       
       if (!validation.valid) {
         setRestored(false);
+        const errorMessages = validation.errors?.length
+          ? validation.errors
+          : [validation.message ?? 'The selected image cannot be analyzed.'];
         setState((prev) => ({
           ...prev,
           error: validation.message ?? 'The selected image cannot be analyzed.',
+          errorList: errorMessages,
           step: 'capture',
           isLoading: false,
           // imageData already set above — kept so the user can retake/retry.
@@ -306,6 +312,7 @@ export default function Home() {
       setState((prev) => ({
         ...prev,
         error: friendlyApiError(errorMessage),
+        errorList: null,
         step: 'capture',
         isLoading: false,
         // Keep imageData so the user can retry the same photo or retake —
@@ -331,6 +338,7 @@ export default function Home() {
       imageData: null,
       analysis: null,
       error: null,
+      errorList: null,
       isLoading: false,
       validationProgress: 0,
       validationMessage: '',
@@ -416,7 +424,15 @@ export default function Home() {
                 <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-red-900 dark:text-red-100">Analysis Error</p>
-                  <p className="text-red-800 text-sm dark:text-red-200">{state.error}</p>
+                  {state.errorList && state.errorList.length > 1 ? (
+                    <ul className="mt-1 space-y-1 text-sm text-red-800 dark:text-red-200 list-disc list-inside">
+                      {state.errorList.map((err, idx) => (
+                        <li key={idx}>{err}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-red-800 text-sm dark:text-red-200">{state.error}</p>
+                  )}
                 </div>
               </div>
 

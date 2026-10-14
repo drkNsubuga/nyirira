@@ -191,7 +191,7 @@ export async function checkOrientationAndPose(dataUri: string): Promise<{ valid:
 export async function runFullImageValidation(
   dataUri: string,
   onProgress?: (progress: number, message: string) => void
-): Promise<{ valid: boolean; message?: string }> {
+): Promise<{ valid: boolean; message?: string; errors?: string[] }> {
   const checks = [
     {
       name: 'Face Detection',
@@ -211,6 +211,8 @@ export async function runFullImageValidation(
     }
   ];
   
+  const errors: string[] = [];
+
   for (let i = 0; i < checks.length; i++) {
     const progress = ((i + 1) / checks.length) * 100;
     if (onProgress) {
@@ -219,13 +221,19 @@ export async function runFullImageValidation(
     
     try {
       const result = await checks[i].fn();
-      if (!result.valid) {
-        return result;
+      // Collect every failure so the user sees all issues at once instead of
+      // fixing them one photo at a time.
+      if (!result.valid && result.message) {
+        errors.push(result.message);
       }
     } catch (err) {
       console.warn(`${checks[i].name} failed:`, err);
     }
   }
   
+  if (errors.length > 0) {
+    return { valid: false, message: errors.join(' '), errors };
+  }
+
   return { valid: true };
 }

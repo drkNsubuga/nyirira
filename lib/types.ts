@@ -77,6 +77,7 @@ export interface AppState {
   imageData: string | null;
   analysis: AnalysisResponse | null;
   error: string | null;
+  errorList: string[] | null;
   isLoading: boolean;
   validationProgress: number;
   validationMessage: string;

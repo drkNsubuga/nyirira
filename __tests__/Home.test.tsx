@@ -128,7 +128,8 @@ describe('Home page', () => {
     (analyzeImage as jest.Mock).mockClear();
     (runFullImageValidation as jest.Mock).mockResolvedValueOnce({
       valid: false,
-      message: 'Image resolution too low (320×240px). The short side must be at least 480px.',
+      message:
+        'Image resolution too low (320×240px). The short side must be at least 480px.',
     });
 
     render(<Home />);
@@ -142,6 +143,28 @@ describe('Home page', () => {
     expect(screen.getByText(/Image resolution too low/i)).toBeInTheDocument();
     expect(screen.getByAltText('Photo that failed analysis')).toBeInTheDocument();
     // Analysis must never be attempted for an invalid image.
+    expect(analyzeImage).not.toHaveBeenCalled();
+  });
+
+  it('lists all validation errors at once when multiple checks fail', async () => {
+    (analyzeImage as jest.Mock).mockClear();
+    (runFullImageValidation as jest.Mock).mockResolvedValueOnce({
+      valid: false,
+      message: 'No face detected. Face is too blurry.',
+      errors: ['No face detected.', 'Face is too blurry.'],
+    });
+
+    render(<Home />);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['bytes'], 'bad.jpg', { type: 'image/jpeg' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    fireEvent.click(await screen.findByText('Analyze'));
+
+    await screen.findByText('Analysis Error');
+    // Both failures must be visible simultaneously.
+    expect(screen.getByText('No face detected.')).toBeInTheDocument();
+    expect(screen.getByText('Face is too blurry.')).toBeInTheDocument();
     expect(analyzeImage).not.toHaveBeenCalled();
   });
 
