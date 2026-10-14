@@ -107,6 +107,23 @@ export function addAnalysisToHistory(item: AnalysisHistoryItem) {
   return next;
 }
 
+/** Remove all saved analysis history and notify same-tab subscribers. */
+export function clearAnalysisHistory() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.removeItem(HISTORY_KEY);
+  notifyStorageChange();
+}
+
+/** Remove a single history item by id, keeping the rest. Returns remaining items. */
+export function removeAnalysisFromHistory(id: string) {
+  const next = getAnalysisHistory().filter((item) => item.id !== id);
+  saveAnalysisHistory(next);
+  return next;
+}
+
 export function getAppSettings(): AppSettings {
   if (typeof window === 'undefined') {
     return defaultSettings;

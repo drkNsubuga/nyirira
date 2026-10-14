@@ -3,7 +3,43 @@
  */
 
 import * as blazeface from '@tensorflow-models/blazeface';
+// Bundlers (Next.js/webpack, Vite, Jest) tree-shake the side-effectful backend
+// registrations out of the `@tensorflow/tfjs` barrel, leaving the backend
+// registry empty and every op throwing "No backend found in registry".
+// Import the backends explicitly so they register themselves, then pick the
+// best available one before any model runs.
+import '@tensorflow/tfjs-backend-cpu';
+import '@tensorflow/tfjs-backend-webgl';
 import * as tf from '@tensorflow/tfjs';
+
+let backendReady: Promise<void> | null = null;
+
+/**
+ * Ensure a TensorFlow.js backend is initialized. Tries WebGL (fast, GPU) first
+ * and falls back to the always-available CPU backend. Never throws: if no
+ * backend can be initialized the promise still resolves and callers degrade
+ * gracefully instead of blocking analysis.
+ */
+function ensureBackend(): Promise<void> {
+  if (!backendReady) {
+    backendReady = (async () => {
+      const preferred = ['webgl', 'cpu'];
+      for (const name of preferred) {
+        try {
+          if (tf.engine().registryFactory[name as 'webgl' | 'cpu'] || tf.findBackend(name)) {
+            await tf.setBackend(name);
+            await tf.ready();
+            return;
+          }
+        } catch {
+          // Try the next candidate.
+        }
+      }
+      await tf.ready().catch(() => undefined);
+    })();
+  }
+  return backendReady;
+}
 
 /**
  * True when the browser reports no connectivity. Network-dependent ML checks
@@ -44,6 +80,9 @@ export async function detectFaceAndQuality(dataUri: string): Promise<{ valid: bo
   // stay permissive (the server remains the source of truth for real analysis).
   if (isOffline()) return { valid: true };
   try {
+    // Must run before blazeface.load(), otherwise model init hits an empty
+    // backend registry ("No backend found in registry").
+    await ensureBackend();
     const model = await blazeface.load();
     const canvas = await createImageData(dataUri);
     if (!canvas) return { valid: true };

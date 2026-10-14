@@ -4,6 +4,8 @@ import {
   SETTINGS_KEY,
   NYIRIRA_STORAGE_EVENT,
   addAnalysisToHistory,
+  clearAnalysisHistory,
+  removeAnalysisFromHistory,
   defaultSettings,
   getAnalysisHistory,
   getAppSettings,
@@ -100,6 +102,26 @@ describe('storage', () => {
     it('addAnalysisToHistory keeps at most 6 items', () => {
       for (let i = 0; i < 9; i += 1) addAnalysisToHistory(makeItem(String(i)));
       expect(getAnalysisHistory()).toHaveLength(6);
+    });
+
+    it('clearAnalysisHistory removes all items and the stored key', () => {
+      addAnalysisToHistory(makeItem('a'));
+      addAnalysisToHistory(makeItem('b'));
+      expect(getAnalysisHistory()).toHaveLength(2);
+
+      clearAnalysisHistory();
+      expect(getAnalysisHistory()).toEqual([]);
+      expect(window.localStorage.getItem(HISTORY_KEY)).toBeNull();
+    });
+
+    it('removeAnalysisFromHistory removes only the matching item', () => {
+      addAnalysisToHistory(makeItem('a'));
+      addAnalysisToHistory(makeItem('b'));
+      addAnalysisToHistory(makeItem('c'));
+
+      const remaining = removeAnalysisFromHistory('b');
+      expect(remaining.map((i) => i.id)).toEqual(['c', 'a']);
+      expect(getAnalysisHistory().map((i) => i.id)).toEqual(['c', 'a']);
     });
 
     it('saveAnalysisHistory stores at most 6 items and notifies', () => {

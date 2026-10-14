@@ -2,17 +2,19 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { AlertCircle, Camera, Clock3, Download, Loader2, RotateCcw, Share2, Settings, Sparkles } from 'lucide-react';
+import { AlertCircle, Camera, Clock3, Download, Loader2, RotateCcw, Share2, Settings, Sparkles, Trash2, X } from 'lucide-react';
 import CameraCapture from '@/components/CameraCapture';
 import AnalysisDashboard from '@/components/AnalysisDashboard';
 import HistoryCompare from '@/components/HistoryCompare';
 import Toast, { ToastMessage } from '@/components/Toast';
-import { AppState } from '@/lib/types';
+import { AppState, AnalysisResponse } from '@/lib/types';
 import {
   ANALYSIS_KEY,
   HISTORY_KEY,
   SETTINGS_KEY,
   addAnalysisToHistory,
+  clearAnalysisHistory,
+  removeAnalysisFromHistory,
   parseAnalysis,
   parseHistory,
   parseSettings,
@@ -244,6 +246,29 @@ export default function Home() {
     showToast('success', 'Results image downloaded');
   };
 
+  // Guard against empty/incomplete results so the dashboard never renders blank.
+  // A response is "complete" only when every required analysis section has the
+  // numeric/text data the dashboard needs (FR2 + FR3).
+  const hasCompleteAnalysis = (result: AnalysisResponse | null): result is AnalysisResponse => {
+    if (!result) return false;
+    const skin = result.skinAnalysis;
+    const vto = result.vto;
+    return Boolean(
+      skin &&
+        typeof skin.healthScore === 'number' &&
+        Number.isFinite(skin.healthScore) &&
+        skin.spots &&
+        skin.texture &&
+        skin.redness &&
+        Array.isArray(skin.safetyFlags) &&
+        Array.isArray(skin.barrierRepairRegimen) &&
+        vto &&
+        Array.isArray(vto.recommendedLipShades) &&
+        vto.recommendedLipShades.length > 0 &&
+        vto.outfitPalette,
+    );
+  };
+
   const handleImageCapture = async (imageData: string) => {
     setState((prev) => ({
       ...prev,
@@ -288,6 +313,22 @@ export default function Home() {
       const compressed = await compressImage(imageData);
 
       const result = await analyzeImage(compressed);
+
+      // Never surface empty/incomplete results — treat a malformed response as a
+      // failure so the user sees the friendly alert + their photo, not a blank
+      // dashboard. This keeps every "results" render backed by real data.
+      if (!hasCompleteAnalysis(result)) {
+        setRestored(false);
+        setState((prev) => ({
+          ...prev,
+          error: 'The analysis returned no usable results. Please try a clearer photo.',
+          errorList: null,
+          step: 'capture',
+          isLoading: false,
+        }));
+        return;
+      }
+
       const item = {
         id: Date.now().toString(),
         createdAt: new Date().toISOString(),
@@ -569,17 +610,30 @@ export default function Home() {
               <div className="flex items-center gap-2 mb-4">
                 <Clock3 className="w-4 h-4 text-slate-600" />
                 <h2 className="font-semibold text-slate-900">Recent History</h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearAnalysisHistory();
+                    showToast('info', 'History cleared');
+                  }}
+                  className="ml-auto inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                >
+                  <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                  Clear history
+                </button>
               </div>
 
               <div className="space-y-3">
                 {history.map((item) => (
-                  <button
+                  <div
                     key={item.id}
-                    type="button"
-                    onClick={() => setState({ ...defaultState, step: 'results', analysis: item.analysis, imageData: item.imageData })}
-                    className="flex w-full items-center justify-between gap-4 rounded-xl border border-slate-200 p-3 text-left hover:border-emerald-200 hover:bg-emerald-50"
+                    className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 p-3 hover:border-emerald-200 hover:bg-emerald-50"
                   >
-                    <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setState({ ...defaultState, step: 'results', analysis: item.analysis, imageData: item.imageData })}
+                      className="flex flex-1 items-center gap-3 text-left"
+                    >
                       <div
                         className="h-12 w-12 rounded-lg bg-cover bg-center"
                         style={{ backgroundImage: `url(${item.imageData})` }}
@@ -590,9 +644,22 @@ export default function Home() {
                           {new Date(item.createdAt).toLocaleDateString()} · {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-emerald-700">Open</span>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${item.summary}`}
+                        onClick={() => {
+                          removeAnalysisFromHistory(item.id);
+                          showToast('info', 'History item removed');
+                        }}
+                        className="rounded-full border border-slate-200 p-1.5 text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                      >
+                        <X className="w-4 h-4" aria-hidden="true" />
+                      </button>
                     </div>
-                    <span className="text-xs text-emerald-700">Open</span>
-                  </button>
+                  </div>
                 ))}
               </div>
             </section>

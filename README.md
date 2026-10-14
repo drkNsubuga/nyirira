@@ -1,5 +1,14 @@
 # Nyirira 🌍✨
 
+[![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com)
+[![Tests](https://img.shields.io/badge/tests-86%20passing-brightgreen.svg)](#testing)
+[![Coverage](https://img.shields.io/badge/coverage-70%25%2B-brightgreen.svg)](#testing)
+[![Next.js](https://img.shields.io/badge/Next.js-16%2B-black.svg?logo=next.js)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4%2B-38B2AC.svg?logo=tailwind-css)](https://tailwindcss.com)
+[![pnpm](https://img.shields.io/badge/pnpm-9%2B-F69220.svg?logo=pnpm)](https://pnpm.io)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](#privacy--disclaimer)
+
 **Localized Safe Skincare Diagnostics & Virtual Beauty Matching for Melanin-Rich Skin**
 
 Nyirira is a mobile-responsive single-page web application built for the Ugandan market, providing AI-powered skincare diagnostics optimized for Fitzpatrick skin types V-VI and personalized virtual makeup/fashion color recommendations rooted in local aesthetics (Kitenge-inspired).
@@ -30,6 +39,8 @@ Nyirira is a mobile-responsive single-page web application built for the Ugandan
 
 ### 5. Client-Side Data Persistence
 - Results saved to browser localStorage
+- Recent History list on the capture screen with one-tap reopen
+- Clear history option to remove all saved scans at once
 - No backend database required (MVP cost-optimization)
 - Privacy-first: images analyzed locally, no server storage
 

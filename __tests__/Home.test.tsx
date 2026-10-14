@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Home from '@/app/page';
-import { saveAnalysis, saveAnalysisHistory } from '@/lib/storage';
+import { saveAnalysis, saveAnalysisHistory, getAnalysisHistory } from '@/lib/storage';
 import { AnalysisResponse } from '@/lib/types';
 import { analyzeImage } from '@/lib/youcamClient';
 import { compressImage } from '@/lib/image';
@@ -92,6 +92,77 @@ describe('Home page', () => {
     render(<Home />);
     expect(screen.getByText('Recent History')).toBeInTheDocument();
     expect(screen.getByText('Skin score 72/100')).toBeInTheDocument();
+  });
+
+  it('clears the history when the Clear history button is clicked', () => {
+    saveAnalysisHistory([
+      {
+        id: 'h1',
+        createdAt: '2026-10-12T10:00:00.000Z',
+        summary: 'Skin score 72/100',
+        imageData: 'data:image/png;base64,AAAA',
+        analysis: makeAnalysis(72),
+      },
+    ]);
+    render(<Home />);
+
+    fireEvent.click(screen.getByRole('button', { name: /clear history/i }));
+
+    expect(screen.queryByText('Recent History')).not.toBeInTheDocument();
+    expect(getAnalysisHistory()).toEqual([]);
+    expect(screen.getByText(/history cleared/i)).toBeInTheDocument();
+  });
+
+  it('removes a single history item without affecting the others', () => {
+    saveAnalysisHistory([
+      {
+        id: 'h1',
+        createdAt: '2026-10-12T10:00:00.000Z',
+        summary: 'Skin score 72/100',
+        imageData: 'data:image/png;base64,AAAA',
+        analysis: makeAnalysis(72),
+      },
+      {
+        id: 'h2',
+        createdAt: '2026-10-11T10:00:00.000Z',
+        summary: 'Skin score 60/100',
+        imageData: 'data:image/png;base64,BBBB',
+        analysis: makeAnalysis(60),
+      },
+    ]);
+    render(<Home />);
+
+    // Remove only the first item via its per-item delete button.
+    fireEvent.click(screen.getByRole('button', { name: /remove skin score 72\/100/i }));
+
+    expect(screen.queryByText('Skin score 72/100')).not.toBeInTheDocument();
+    expect(screen.getByText('Skin score 60/100')).toBeInTheDocument();
+    expect(getAnalysisHistory().map((i) => i.id)).toEqual(['h2']);
+    expect(screen.getByText(/history item removed/i)).toBeInTheDocument();
+  });
+
+  it('shows an error instead of empty results when the analysis response is incomplete', async () => {
+    (analyzeImage as jest.Mock).mockResolvedValueOnce({
+      // Missing vto + numeric fields — the "no usable results" guard must fire.
+      skinAnalysis: { healthScore: undefined },
+      timestamp: '2026-10-12T10:00:00.000Z',
+      imageWidth: 720,
+      imageHeight: 960,
+    });
+
+    render(<Home />);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['bytes'], 'selfie.jpg', { type: 'image/jpeg' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    fireEvent.click(await screen.findByText('Analyze'));
+
+    await screen.findByText('Analysis Error');
+    expect(screen.getByText(/no usable results/i)).toBeInTheDocument();
+    // The dashboard must NOT render for an empty response.
+    expect(screen.queryByText(/Health Score/i)).not.toBeInTheDocument();
+    // Nothing was persisted to history.
+    expect(getAnalysisHistory()).toEqual([]);
   });
 
   it('renders the footer disclaimer', () => {
