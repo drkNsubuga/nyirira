@@ -1,16 +1,13 @@
 /**
- * Client-side image validation.
+ * Client-side image validation with advanced checks.
  *
- * Pre-flights images against the YouCam (Perfect Corp) file/feature specs
- * before submission so obvious problems (size, resolution) fail fast with
- * friendly guidance instead of burning a task + a 2-minute poll to discover
- * the same thing server-side.
- *
- * Specs (https://docs.perfectcorp.com):
- * - Skin Analysis: long side <= 2560px, short side >= 480px (SD)
- * - Look VTO: long side < 1920px, face width >= 100px, file < 10MB
- * - General: jpg/jpeg/png, file < 10MB
+ * Comprehensive validation using browser APIs and ML models to catch
+ * invalid images before submission, reducing API errors and credit usage.
+ * All processing happens client-side for privacy.
  */
+
+import * as blazeface from '@tensorflow-models/blazeface';
+import * as tf from '@tensorflow/tfjs';
 
 export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 export const MIN_SHORT_SIDE_PX = 480;
@@ -76,7 +73,6 @@ export async function validateImageResolution(dataUri: string): Promise<ImageVal
   if (!sizeCheck.valid) return sizeCheck;
 
   const dims = await readImageDimensions(dataUri);
-  // Dimensions unavailable (e.g. jsdom) — let the server be the judge.
   if (!dims || dims.width === 0 || dims.height === 0) return OK;
 
   const longSide = Math.max(dims.width, dims.height);

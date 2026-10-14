@@ -22,6 +22,7 @@ import { useLocalStorageValue } from '@/lib/useLocalStorage';
 import { analyzeImage } from '@/lib/youcamClient';
 import { compressImage } from '@/lib/image';
 import { validateImageResolution } from '@/lib/imageValidation';
+import { runFullImageValidation } from '@/lib/advancedValidation';
 import { exportResultAsPng } from '@/lib/export';
 
 const defaultState: AppState = {
@@ -30,6 +31,8 @@ const defaultState: AppState = {
   analysis: null,
   error: null,
   isLoading: false,
+  validationProgress: 0,
+  validationMessage: '',
 };
 
 /**
@@ -70,6 +73,18 @@ export default function Home() {
   const [state, setState] = useState<AppState>(defaultState);
   const [restored, setRestored] = useState(true);
   const [toast, setToast] = useState<ToastMessage | null>(null);
+  
+  // Destructure validation state for easier access
+  const { validationProgress, validationMessage } = state;
+  
+  // Validation setters
+  const setValidationProgress = (progress: number) => {
+    setState(prev => ({ ...prev, validationProgress: progress }));
+  };
+  
+  const setValidationMessage = (message: string) => {
+    setState(prev => ({ ...prev, validationMessage: message }));
+  };
 
   const analysis = state.analysis ?? (restored ? storedAnalysis : null);
   const viewStep: AppState['step'] =
@@ -119,9 +134,17 @@ export default function Home() {
     }));
 
     try {
-      // Pre-flight validation (size, resolution) — fail fast with a friendly
-      // message instead of burning a real API task on a doomed image.
-      const validation = await validateImageResolution(imageData);
+      // Comprehensive validation (size, resolution, face, quality, privacy) 
+      // — fail fast with friendly messages instead of burning API credits on
+      // doomed images. All processing happens client-side for privacy.
+      setValidationProgress(0);
+      setValidationMessage('Validating image...');
+      
+      const validation = await runFullImageValidation(imageData, (progress, message) => {
+        setValidationProgress(progress);
+        setValidationMessage(message);
+      });
+      
       if (!validation.valid) {
         setRestored(false);
         setState((prev) => ({
@@ -131,6 +154,7 @@ export default function Home() {
           isLoading: false,
           // imageData already set above — kept so the user can retake/retry.
         }));
+        setValidationProgress(0);
         return;
       }
 
@@ -189,6 +213,8 @@ export default function Home() {
       analysis: null,
       error: null,
       isLoading: false,
+      validationProgress: 0,
+      validationMessage: '',
     });
   };
 
@@ -314,7 +340,34 @@ export default function Home() {
             </div>
           )}
 
-          {viewStep === 'capture' && !state.error && <CameraCapture onImageCapture={handleImageCapture} />}
+          {viewStep === 'capture' && (
+            <div className="flex flex-col items-center">
+              {/* Validation Progress UI */}
+              {state.validationProgress > 0 && state.validationProgress < 100 && (
+                <div className="w-full max-w-md bg-white rounded-xl p-6 shadow-lg mb-8 border border-slate-200 dark:bg-slate-800 dark:border-slate-700">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-slate-900 dark:text-slate-100">Validating Image</h3>
+                      <span className="text-sm text-slate-500 dark:text-slate-400">
+                        {Math.round(state.validationProgress)}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-2 dark:bg-slate-700">
+                      <div
+                        className="bg-emerald-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${state.validationProgress}%` }}
+                      />
+                    </div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 text-center">
+                      {state.validationMessage}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {!state.error && <CameraCapture onImageCapture={handleImageCapture} />}
+            </div>
+          )}
 
           {viewStep === 'processing' && (
             <div className="flex flex-col items-center justify-center py-12">

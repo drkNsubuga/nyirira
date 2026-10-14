@@ -11,9 +11,12 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@tensorflow-models/blazeface": "^0.1.0",
+    "@tensorflow/tfjs": "^4.22.0",
     "next": "16.4.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.13.16",

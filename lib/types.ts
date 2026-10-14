@@ -78,4 +78,6 @@ export interface AppState {
   analysis: AnalysisResponse | null;
   error: string | null;
   isLoading: boolean;
+  validationProgress: number;
+  validationMessage: string;
 }
