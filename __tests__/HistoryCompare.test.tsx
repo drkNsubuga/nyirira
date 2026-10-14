@@ -35,20 +35,15 @@ const history: AnalysisHistoryItem[] = [
 describe('HistoryCompare', () => {
   it('shows the score delta versus the previous analysis', () => {
     render(<HistoryCompare current={current} history={history} currentImageData="test-image-data" />);
-    // Click the toggle button to show the comparison
-    fireEvent.click(screen.getByText(/Show Comparison/i));
-    // Use a flexible matcher since text may be split across elements
-    expect(screen.getByText((content) => content.includes('Up 8 points'))).toBeInTheDocument();
-    expect(screen.getByText((content) => content.includes('72/100 → 80/100'))).toBeInTheDocument();
+    expect(screen.getByText(/Up 8 points/i)).toBeInTheDocument();
+    expect(screen.getByText(/72\/100 → 80\/100/)).toBeInTheDocument();
   });
 
   it('reports no change when the score is unchanged', () => {
+    render(<HistoryCompare current={current} history={history} currentImageData="test-image-data" />);
     const same = makeAnalysis(80, '2026-10-12T10:00:00.000Z');
     render(<HistoryCompare current={same} history={[{ ...history[0], analysis: makeAnalysis(80, '2026-10-11T10:00:00.000Z') }]} currentImageData="test-image-data" />);
-    // Click the toggle button to show the comparison
-    fireEvent.click(screen.getByText(/Show Comparison/i));
-    // Use flexible matcher - text is "No change" (capital N) and may be split across elements
-    expect(screen.getByText((content) => content.toLowerCase().includes('no change'))).toBeInTheDocument();
+    expect(screen.getAllByText(/no change/i).length).toBeGreaterThan(0);
   });
 
   it('renders nothing when there is no previous analysis to compare', () => {

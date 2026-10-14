@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { TrendingDown, TrendingUp, Eye, Calendar } from 'lucide-react';
+import { TrendingUp, Eye, Calendar } from 'lucide-react';
 import { AnalysisResponse } from '@/lib/types';
 import { AnalysisHistoryItem } from '@/lib/storage';
 
@@ -61,7 +61,7 @@ export default function HistoryCompare({ current, history, currentImageData }: H
         </button>
       </div>
 
-      {/* Score summary */}
+{/* Score summary */}
       <div className={`mb-4 flex items-center gap-3 rounded-2xl border p-4 text-sm shadow-sm ${
         delta === 0
           ? 'border-slate-200 bg-white text-slate-600'

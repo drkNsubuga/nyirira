@@ -49,10 +49,9 @@ const sampleAnalysis: AnalysisResponse = {
 describe('AnalysisDashboard', () => {
   it('renders the health score', () => {
     render(<AnalysisDashboard analysis={sampleAnalysis} onBack={() => {}} imageData="test-image-data" />);
-    // The main health score card should contain the score
-    expect(screen.getByText(/Health Score/i)).toBeInTheDocument();
-    // Use getAllByText and check the first one (main score card)
-    expect(screen.getAllByText('72')[0]).toBeInTheDocument();
+    // Find the health score within the score circle container
+    const scoreCircle = screen.getByText('Health Score').previousElementSibling;
+    expect(scoreCircle).toHaveTextContent('72');
   });
 
   it('renders safety flags and recommendations', () => {
