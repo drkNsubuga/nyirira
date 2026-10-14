@@ -8,10 +8,6 @@ import { AnalysisResponse, SkinAnalysisResult, VTOResult } from './types';
 
 const ENV_REAL_API_ENABLED = process.env.NEXT_PUBLIC_USE_REAL_API === 'true';
 
-// Configurable API endpoints (can be overridden via environment variables)
-const SKIN_ANALYSIS_ENDPOINT = process.env.NEXT_PUBLIC_YOUCAM_SKIN_ENDPOINT ?? '/api/skinAnalysis';
-const VTO_ENDPOINT = process.env.NEXT_PUBLIC_YOUCAM_VTO_ENDPOINT ?? '/api/virtualTryOn';
-
 export function shouldUseRealApi(): boolean {
   if (typeof window !== 'undefined') {
     try {
@@ -233,9 +229,136 @@ async function fetchWithRetry(url: string, init: RequestInit, maxRetries = 2): P
 }
 
 /**
- * Real YouCam API integration (placeholder)
- * To be implemented when API credentials are available
+ * Real YouCam (Perfect Corp) API integration.
+ *
+ * Uses the async task workflow documented at:
+ * - https://docs.perfectcorp.com/reference/ai_skin_analysis
+ * - https://docs.perfectcorp.com/reference/ai_look_vto
+ *
+ * Flow: upload image via File API → create task → poll until complete.
  */
+const SKIN_ANALYSIS_TASK_PATH = '/s2s/v2.0/task/skin-analysis';
+const LOOK_VTO_TASK_PATH = '/s2s/v2.0/task/look-vto';
+const FILE_UPLOAD_PATH = '/s2s/v2.0/file';
+
+function dataUriToBlob(dataUri: string): Blob {
+  const [header, base64] = dataUri.split(',');
+  const mime = header.match(/data:(.*?);/)?.[1] ?? 'image/jpeg';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+/** Step 1: Upload image via Perfect Corp File API, return file_id. */
+async function uploadImageFile(baseUrl: string, apiKey: string, imageData: string): Promise<string> {
+  const blob = dataUriToBlob(imageData);
+  const fileName = `skin_${Date.now()}.jpg`;
+  const contentType = blob.type || 'image/jpeg';
+
+  // Initialise file upload — server returns file_id + upload_url.
+  const initRes = await fetchWithRetry(`${baseUrl}${FILE_UPLOAD_PATH}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      files: [{ content_type: contentType, file_name: fileName, file_size: blob.size }],
+    }),
+  });
+  if (!initRes.ok) {
+    const detail = await initRes.text().catch(() => '');
+    throw new Error(`File init failed: ${initRes.status} ${initRes.statusText} ${detail}`);
+  }
+  const initData = await initRes.json();
+  // Response shape: { status, data: { files: [{ file_id, requests: [{ method, url, headers }] }] } }
+  const fileEntry = initData?.data?.files?.[0] ?? initData?.files?.[0];
+  const fileId: string | undefined = fileEntry?.file_id;
+  // requests is an ARRAY: [{ method: 'PUT', url: presignedUrl, headers }]
+  const request = Array.isArray(fileEntry?.requests) ? fileEntry.requests[0] : undefined;
+  const uploadUrl: string | undefined = request?.url ?? fileEntry?.upload_url;
+  const uploadMethod: string = request?.method ?? 'PUT';
+  if (!fileId) throw new Error('file_id missing from file init response');
+  if (!uploadUrl) {
+    throw new Error(`upload URL missing from file init response: ${JSON.stringify(initData)}`);
+  }
+
+  // Upload raw bytes to the presigned URL — without this the file_id points
+  // at an empty object and downstream tasks fail with 403.
+  const putRes = await fetch(uploadUrl, {
+    method: uploadMethod,
+    body: blob,
+    headers: { 'Content-Type': contentType },
+  });
+  if (!putRes.ok) {
+    const detail = await putRes.text().catch(() => '');
+    throw new Error(`File upload failed: ${putRes.status} ${putRes.statusText} ${detail}`);
+  }
+
+  return fileId;
+}
+
+/** Fetch the first available look-vto template id (required by the task API). */
+async function getFirstLookVtoTemplate(baseUrl: string, apiKey: string): Promise<string> {
+  const res = await fetchWithRetry(`${baseUrl}/s2s/v2.0/task/template/look-vto?page_size=1`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!res.ok) {
+    throw new Error(`Template list failed: ${res.status} ${res.statusText}`);
+  }
+  const data = await res.json();
+  const templates = data?.templates ?? data?.data?.templates ?? [];
+  const templateId: string | undefined = templates[0]?.template_id ?? templates[0]?.id;
+  if (!templateId) throw new Error('No look-vto templates available');
+  return templateId;
+}
+
+/** Step 2: Create a task (skin-analysis or look-vto), return task_id. */
+async function startTask(baseUrl: string, apiKey: string, taskPath: string, body: Record<string, unknown>): Promise<string> {
+  const res = await fetchWithRetry(`${baseUrl}${taskPath}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`Task start failed: ${res.status} ${res.statusText} ${detail}`);
+  }
+  const data = await res.json();
+  const taskId: string | undefined = data?.data?.task_id;
+  if (!taskId) throw new Error('task_id missing from task response');
+  return taskId;
+}
+
+/** Step 3: Poll task until success/error. */
+async function pollTask(
+  baseUrl: string,
+  apiKey: string,
+  taskPath: string,
+  taskId: string,
+  intervalMs = 2000,
+  maxAttempts = 60
+): Promise<Record<string, unknown>> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const res = await fetch(`${baseUrl}${taskPath}/${taskId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) {
+      throw new Error(`Task poll failed: ${res.status} ${res.statusText}`);
+    }
+    const payload = await res.json();
+    const status = payload?.data?.task_status;
+    if (status === 'success') return payload?.data;
+    if (status === 'error') throw new Error(`Task failed: ${JSON.stringify(payload)}`);
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  throw new Error('Task polling timed out');
+}
+
 async function callRealYouCamAPI(imageData: string): Promise<AnalysisResponse> {
   const apiKey = process.env.NEXT_PUBLIC_YOUCAM_API_KEY;
   const baseUrl = process.env.NEXT_PUBLIC_YOUCAM_API_URL;
@@ -247,41 +370,34 @@ async function callRealYouCamAPI(imageData: string): Promise<AnalysisResponse> {
   }
 
   try {
-    const skinResponse = await fetchWithRetry(`${baseUrl}${SKIN_ANALYSIS_ENDPOINT}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        image: imageData,
-        analyzeFor: ['spots', 'texture', 'redness', 'fitzpatrick'],
+    // Upload the image once; both tasks can reference the same file_id.
+    const fileId = await uploadImageFile(baseUrl, apiKey, imageData);
+
+    // Look VTO requires a template_id — grab the first available template.
+    const templateId = await getFirstLookVtoTemplate(baseUrl, apiKey);
+
+    // Start skin-analysis and look-vto tasks in parallel.
+    const [skinTaskId, vtoTaskId] = await Promise.all([
+      startTask(baseUrl, apiKey, SKIN_ANALYSIS_TASK_PATH, {
+        src_file_id: fileId,
+        // SD actions relevant to Nyirira: spots, texture, redness, radiance.
+        dst_actions: ['age_spot', 'texture', 'redness', 'radiance'],
+        format: 'json',
       }),
-    });
-
-    if (!skinResponse.ok) {
-      throw new Error(`YouCam API error: ${skinResponse.status} ${skinResponse.statusText}`);
-    }
-
-    const skinData = await skinResponse.json();
-
-    const vtoResponse = await fetchWithRetry(`${baseUrl}${VTO_ENDPOINT}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        image: imageData,
-        analyzeFor: ['makeup', 'lipShades', 'colorimetry'],
+      startTask(baseUrl, apiKey, LOOK_VTO_TASK_PATH, {
+        src_file_id: fileId,
+        template_id: templateId,
       }),
-    });
+    ]);
 
-    if (!vtoResponse.ok) {
-      throw new Error(`YouCam VTO API error: ${vtoResponse.status} ${vtoResponse.statusText}`);
-    }
+    // Poll both tasks concurrently until each completes.
+    const [skinTask, vtoTask] = await Promise.all([
+      pollTask(baseUrl, apiKey, SKIN_ANALYSIS_TASK_PATH, skinTaskId),
+      pollTask(baseUrl, apiKey, LOOK_VTO_TASK_PATH, vtoTaskId),
+    ]);
 
-    const vtoData = await vtoResponse.json();
+    const skinData = (skinTask.results ?? skinTask) as Record<string, unknown>;
+    const vtoData = (vtoTask.results ?? vtoTask) as Record<string, unknown>;
 
     const dimensions = await getImageDimensions(imageData);
 

@@ -387,6 +387,8 @@
 - **Risk Areas**: YouCam API reliability, feature scope creep, device compatibility
 - **Dependencies**: Awaiting YouCam API documentation and credentials
 - **Team**: Adjust timeline based on team size & availability
+- **Image sources**: 
+  - [BlackSkinCare](https://www.reddit.com/r/Blackskincare/)
 
 ---
 

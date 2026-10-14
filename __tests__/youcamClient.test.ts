@@ -99,8 +99,10 @@ describe('shouldUseRealApi', () => {
     window.localStorage.clear();
   });
 
-  it('is false by default (no settings, no env)', () => {
-    expect(shouldUseRealApi()).toBe(false);
+  it('reflects env config by default (NEXT_PUBLIC_USE_REAL_API=true in .env)', () => {
+    // ENV_REAL_API_ENABLED is baked in at import time from .env — tests run
+    // against the repo .env which enables the live API by default.
+    expect(shouldUseRealApi()).toBe(process.env.NEXT_PUBLIC_USE_REAL_API === 'true');
   });
 
   it('is true when settings enable the live API', () => {
