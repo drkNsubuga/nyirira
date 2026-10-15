@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { AlertCircle, Camera, Clock3, Download, Loader2, RotateCcw, Share2, Settings, Sparkles, Trash2, X } from 'lucide-react';
+import { AlertCircle, Camera, Clock3, Download, Loader2, RotateCcw, Share2, Settings, Sparkles, Trash2, X, HelpCircle } from 'lucide-react';
 import CameraCapture from '@/components/CameraCapture';
 import AnalysisDashboard from '@/components/AnalysisDashboard';
 import ScanOverlay from '@/components/ScanOverlay';
@@ -126,6 +126,10 @@ function friendlyApiError(message: string): string {
     // Real YouCam task-error codes (task errors nest under data.error).
     // The src_ prefix is the input image on skin analysis; dst_ appears on
     // VTO tasks. Face-too-small means the face is under ~60% of image width.
+    error_below_min_image_size:
+      'The image is too low-resolution. Move closer to the camera or upload a larger photo.',
+    error_image_too_small:
+      'The image dimensions are too small. Move closer to the camera or upload a larger photo.',
     error_src_face_too_small:
       'Move closer to the camera — your face should fill most of the photo (at least 60% of the width).',
     error_dst_face_too_small:
@@ -152,13 +156,6 @@ function friendlyApiError(message: string): string {
       'No face was detected. Use a clear, front-facing photo of your face.',
     
     // Image quality and size errors
-    error_below_min_image_size:
-      'The image is too low-resolution. Move closer to the camera or upload a larger photo.',
-    error_exceed_max_image_size: 'The image is too large. Upload a smaller photo.',
-    error_image_too_small:
-      'The image dimensions are too small. Please upload a larger photo.',
-    error_image_too_large:
-      'The image dimensions are too large. Please upload a smaller photo.',
     error_invalid_image_format:
       'Invalid image format. Please upload a JPG or PNG image.',
     error_corrupted_image:
@@ -234,6 +231,12 @@ function friendlyApiError(message: string): string {
   }
   if (detail.includes('no face') || detail.includes('face not detect')) {
     return 'No face was detected. Use a clear, front-facing photo of your face.';
+  }
+  if (detail.includes('blur')) {
+    return 'The image is blurry. Hold your camera steady and take a clear photo.';
+  }
+  if (detail.includes('light')) {
+    return 'Poor lighting detected. Ensure you\'re in a well-lit area and face the light source.';
   }
   if (detail.includes('position') || detail.includes('boundary')) {
     return 'Make sure your entire face is fully visible in the frame.';
@@ -445,11 +448,23 @@ export default function Home() {
         isLoading: false,
       }));
     } catch (err) {
+      // Collect all errors that occurred during processing
+      const errors: string[] = [];
+      
+      // Add analysis error
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      const analysisError = friendlyApiError(errorMessage);
+      errors.push(analysisError);
+      
+      // If we have multiple errors, show them all
+      const finalError = errors.length > 1 
+        ? `Multiple issues found:\n\n${errors.map((e, i) => `${i + 1}. ${e}`).join('\n')}`
+        : errors[0];
+      
       setState((prev) => ({
         ...prev,
-        error: friendlyApiError(errorMessage),
-        errorList: null,
+        error: finalError,
+        errorList: errors.length > 1 ? errors : null,
         step: 'capture',
         isLoading: false,
         // Keep imageData so the user can retry the same photo or retake —
@@ -573,7 +588,15 @@ export default function Home() {
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-medium text-red-900 dark:text-red-100">Analysis Error</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-red-900 dark:text-red-100">Analysis Error</p>
+                    <div className="relative group">
+                      <HelpCircle className="w-4 h-4 text-red-400" />
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block bg-black text-white text-xs rounded py-1 px-2 z-10 w-64">
+                        <p className="text-center">To avoid errors: move close, face the camera directly, ensure good lighting, and use a clear photo.</p>
+                      </div>
+                    </div>
+                  </div>
                   {state.errorList && state.errorList.length > 1 ? (
                     <ul className="mt-1 space-y-1 text-sm text-red-800 dark:text-red-200 list-disc list-inside">
                       {state.errorList.map((err, idx) => (
@@ -581,7 +604,9 @@ export default function Home() {
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-red-800 text-sm dark:text-red-200">{state.error}</p>
+                    <div className="mt-1">
+                      <p className="text-red-800 text-sm dark:text-red-200">{state.error}</p>
+                    </div>
                   )}
                 </div>
               </div>

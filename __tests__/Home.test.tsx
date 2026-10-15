@@ -248,6 +248,26 @@ describe('Home page', () => {
     expect(screen.queryByText(/error_src_face_too_small/i)).not.toBeInTheDocument();
   });
 
+  it('shows a helpful error for low resolution API errors', async () => {
+    // error_below_min_image_size is now mapped to a specific message instead of generic.
+    (analyzeImage as jest.Mock).mockRejectedValueOnce(
+      new Error('Task failed: {"status":200,"data":{"error":"error_below_min_image_size","error_message":"The input image is below the minimum required resolution.","results":null,"task_status":"error"}}')
+    );
+
+    render(<Home />);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['bytes'], 'selfie.jpg', { type: 'image/jpeg' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    fireEvent.click(await screen.findByText('Analyze'));
+
+    await screen.findByText('Analysis Error');
+    // Should use the specific message, not "no usable results".
+    expect(screen.getByText(/too low-resolution/i)).toBeInTheDocument();
+    expect(screen.getByText(/move closer/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no usable results/i)).not.toBeInTheDocument();
+  });
+
   it('shows a deployment guidance message when the build has no API credentials', async () => {
     // Cloudflare Pages misconfig: live mode on, NEXT_PUBLIC_* keys absent at build.
     (analyzeImage as jest.Mock).mockRejectedValueOnce(
