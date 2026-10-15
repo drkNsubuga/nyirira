@@ -224,6 +224,73 @@ describe('Home page', () => {
     expect(screen.queryByText('Upload')).not.toBeInTheDocument();
   });
 
+  it('shows a friendly message for nested JSON task errors (data envelope)', async () => {
+    // The exact shape YouCam returns for task errors: {status, data:{error,...}}.
+    (analyzeImage as jest.Mock).mockRejectedValueOnce(
+      new Error(
+        'Task failed: {"status":200,"data":{"error":"error_src_face_too_small","error_message":"The face in the input image is too small. It needs to take up more than 60% of the image width.","results":null,"task_status":"error"}}'
+      )
+    );
+
+    render(<Home />);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['bytes'], 'selfie.jpg', { type: 'image/jpeg' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    fireEvent.click(await screen.findByText('Analyze'));
+
+    await screen.findByText('Analysis Error');
+    // Mapped error_src_face_too_small → the "move closer / 60% width" guidance.
+    expect(screen.getByText(/Move closer to the camera/i)).toBeInTheDocument();
+    expect(screen.getByText(/60% of the width/i)).toBeInTheDocument();
+    // Raw JSON / internal codes must never leak into the alert.
+    expect(screen.queryByText(/task_status/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/error_src_face_too_small/i)).not.toBeInTheDocument();
+  });
+
+  it('shows a deployment guidance message when the build has no API credentials', async () => {
+    // Cloudflare Pages misconfig: live mode on, NEXT_PUBLIC_* keys absent at build.
+    (analyzeImage as jest.Mock).mockRejectedValueOnce(
+      new Error(
+        'YouCam API credentials missing: NEXT_PUBLIC_YOUCAM_API_KEY and NEXT_PUBLIC_YOUCAM_API_URL. ' +
+          'NEXT_PUBLIC_* values are baked into the bundle at BUILD time. On Cloudflare Pages: set them under Settings → Environment variables ...'
+      )
+    );
+
+    render(<Home />);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['bytes'], 'selfie.jpg', { type: 'image/jpeg' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    fireEvent.click(await screen.findByText('Analyze'));
+
+    await screen.findByText('Analysis Error');
+    expect(screen.getByText(/API keys were not available when this build was made/i)).toBeInTheDocument();
+    expect(screen.getByText(/redeploy/i)).toBeInTheDocument();
+    // The technical error text (env var dump) must not leak raw into the alert.
+    expect(screen.queryByText(/baked into the bundle at BUILD time/i)).not.toBeInTheDocument();
+  });
+
+  it('uses the API error_message verbatim for unmapped codes, never raw JSON', async () => {
+    (analyzeImage as jest.Mock).mockRejectedValueOnce(
+      new Error(
+        'Task failed: {"status":200,"data":{"error":"error_99999","error_message":"Something unexpected happened on our side.","results":null,"task_status":"error"}}'
+      )
+    );
+
+    render(<Home />);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['bytes'], 'selfie.jpg', { type: 'image/jpeg' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    fireEvent.click(await screen.findByText('Analyze'));
+
+    await screen.findByText('Analysis Error');
+    expect(screen.getByText(/Something unexpected happened on our side/i)).toBeInTheDocument();
+    expect(screen.queryByText(/task_status/i)).not.toBeInTheDocument();
+  });
+
+
   it('shows the validation error and skips analysis when the image fails pre-flight checks', async () => {
     (analyzeImage as jest.Mock).mockClear();
     (runFullImageValidation as jest.Mock).mockResolvedValueOnce({

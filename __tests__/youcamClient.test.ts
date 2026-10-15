@@ -1,4 +1,4 @@
-import { analyzeImage, shouldUseRealApi } from '@/lib/youcamClient';
+import { analyzeImage, describeYouCamEnv, shouldUseRealApi } from '@/lib/youcamClient';
 import { defaultSettings, saveAppSettings } from '@/lib/storage';
 
 describe('youcamClient', () => {
@@ -115,6 +115,69 @@ describe('shouldUseRealApi', () => {
   it('is true when settings enable the live API', () => {
     saveAppSettings({ ...defaultSettings, useRealAPI: true });
     expect(shouldUseRealApi()).toBe(true);
+  });
+});
+
+describe('credentials diagnostics (CF Pages misconfig scenario)', () => {
+  const savedEnv = {
+    apiKey: process.env.NEXT_PUBLIC_YOUCAM_API_KEY,
+    apiUrl: process.env.NEXT_PUBLIC_YOUCAM_API_URL,
+    useReal: process.env.NEXT_PUBLIC_USE_REAL_API,
+  };
+
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    // Restore env so later suites see the repo .env values again.
+    if (savedEnv.apiKey === undefined) delete process.env.NEXT_PUBLIC_YOUCAM_API_KEY;
+    else process.env.NEXT_PUBLIC_YOUCAM_API_KEY = savedEnv.apiKey;
+    if (savedEnv.apiUrl === undefined) delete process.env.NEXT_PUBLIC_YOUCAM_API_URL;
+    else process.env.NEXT_PUBLIC_YOUCAM_API_URL = savedEnv.apiUrl;
+    if (savedEnv.useReal === undefined) delete process.env.NEXT_PUBLIC_USE_REAL_API;
+    else process.env.NEXT_PUBLIC_USE_REAL_API = savedEnv.useReal;
+    jest.restoreAllMocks();
+  });
+
+  it('throws an actionable error naming the missing vars when live mode is on without credentials', async () => {
+    // Simulate a Cloudflare Pages build that had the env flag but not the keys.
+    process.env.NEXT_PUBLIC_USE_REAL_API = 'true';
+    delete process.env.NEXT_PUBLIC_YOUCAM_API_KEY;
+    delete process.env.NEXT_PUBLIC_YOUCAM_API_URL;
+    global.fetch = jest.fn() as never;
+
+    await expect(analyzeImage('data:image/jpeg;base64,AAAA')).rejects.toThrow(
+      /credentials missing: NEXT_PUBLIC_YOUCAM_API_KEY and NEXT_PUBLIC_YOUCAM_API_URL/,
+    );
+    // Fails before any network call — no credits spent.
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('mentions only the var that is actually missing', async () => {
+    process.env.NEXT_PUBLIC_USE_REAL_API = 'true';
+    process.env.NEXT_PUBLIC_YOUCAM_API_URL = 'https://example.test';
+    delete process.env.NEXT_PUBLIC_YOUCAM_API_KEY;
+    global.fetch = jest.fn() as never;
+
+    await expect(analyzeImage('data:image/jpeg;base64,AAAA')).rejects.toThrow(
+      /credentials missing: NEXT_PUBLIC_YOUCAM_API_KEY\./,
+    );
+    await expect(analyzeImage('data:image/jpeg;base64,AAAA')).rejects.not.toThrow(
+      /NEXT_PUBLIC_YOUCAM_API_URL\./,
+    );
+  });
+
+  it('describeYouCamEnv reports presence only, never values', () => {
+    const env = describeYouCamEnv();
+    expect(env).toEqual({
+      useRealApi: expect.any(Boolean),
+      hasApiKey: expect.any(Boolean),
+      hasApiUrl: expect.any(Boolean),
+    });
+    const serialized = JSON.stringify(env);
+    if (savedEnv.apiKey) expect(serialized).not.toContain(savedEnv.apiKey);
+    if (savedEnv.apiUrl) expect(serialized).not.toContain(savedEnv.apiUrl);
   });
 });
 

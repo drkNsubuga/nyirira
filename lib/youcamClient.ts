@@ -23,6 +23,24 @@ export function shouldUseRealApi(): boolean {
   return process.env.NEXT_PUBLIC_USE_REAL_API === 'true';
 }
 
+/**
+ * Presence-only snapshot of the live-API config (values are never exposed).
+ * Used to build actionable error messages — e.g. on Cloudflare Pages where
+ * NEXT_PUBLIC_* vars only take effect if they exist in the BUILD environment
+ * of the deployment being served.
+ */
+export function describeYouCamEnv(): {
+  useRealApi: boolean;
+  hasApiKey: boolean;
+  hasApiUrl: boolean;
+} {
+  return {
+    useRealApi: shouldUseRealApi(),
+    hasApiKey: Boolean(process.env.NEXT_PUBLIC_YOUCAM_API_KEY),
+    hasApiUrl: Boolean(process.env.NEXT_PUBLIC_YOUCAM_API_URL),
+  };
+}
+
 const ZERO_DIMENSIONS = { width: 0, height: 0 };
 
 /**
@@ -364,8 +382,20 @@ async function callRealYouCamAPI(imageData: string): Promise<AnalysisResponse> {
   const baseUrl = process.env.NEXT_PUBLIC_YOUCAM_API_URL;
 
   if (!apiKey || !baseUrl) {
+    const missing = [
+      !apiKey && 'NEXT_PUBLIC_YOUCAM_API_KEY',
+      !baseUrl && 'NEXT_PUBLIC_YOUCAM_API_URL',
+    ]
+      .filter(Boolean)
+      .join(' and ');
     throw new Error(
-      'YouCam API credentials missing. Set NEXT_PUBLIC_YOUCAM_API_KEY and NEXT_PUBLIC_YOUCAM_API_URL'
+      `YouCam API credentials missing: ${missing}. ` +
+        'NEXT_PUBLIC_* values are baked into the bundle at BUILD time. ' +
+        'On Cloudflare Pages: set them under Settings → Environment variables for ' +
+        'the environment you are deploying (Production AND Preview), then REDEPLOY — ' +
+        'vars added after the last build, or in wrangler.toml [vars], are not picked ' +
+        'up by this static export. Note: the Settings → "Use live API" toggle can ' +
+        'also enable live mode per-browser even when no env vars were built in.'
     );
   }
 

@@ -45,22 +45,47 @@ const defaultState: AppState = {
  * See https://docs.perfectcorp.com (error codes).
  * All error handling is done offline for reliability.
  */
-function friendlyApiError(message: string): string {
-  const code = message.match(/error_[a-z_]+/)?.[0];
-  const jsonError = message.match(/\{[^}]*\}/)?.[0];
-  
-  // Try to parse JSON error payload
-  let errorData: { error?: string; error_message?: string } | null = null;
-  if (jsonError) {
-    try {
-      errorData = JSON.parse(jsonError);
-    } catch {
-      // Invalid JSON, continue with string matching
-    }
-  }
 
-  // Use error from JSON payload if available
-  const errorCode = errorData?.error || code;
+interface YouCamErrorPayload {
+  error?: string;
+  error_message?: string;
+  data?: { error?: string; error_message?: string };
+}
+
+/**
+ * Extract a JSON error payload from a message that mixes text + JSON.
+ * Handles NESTED payloads like:
+ *   Task failed: {"status":200,"data":{"error":"error_src_face_too_small",...}}
+ * by slicing from the first "{" to the last "}" (the regex approach breaks on
+ * the first inner "}") and unwrapping the "data" envelope the API wraps task
+ * errors in.
+ */
+function parseYouCamErrorPayload(message: string): YouCamErrorPayload | null {
+  const start = message.indexOf('{');
+  const end = message.lastIndexOf('}');
+  if (start === -1 || end <= start) return null;
+  try {
+    const parsed = JSON.parse(message.slice(start, end + 1)) as YouCamErrorPayload;
+    // Task errors nest under {status, data:{error, error_message}}; file-init
+    // style errors are flat. Unify both shapes.
+    return parsed.data ?? parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Match an error code anywhere in the message (handles the digits in codes
+ * like error_40001 that the old [a-z_] pattern missed).
+ */
+function extractErrorCode(message: string): string | undefined {
+  return message.match(/error_[a-z0-9_]+/i)?.[0]?.toLowerCase();
+}
+
+function friendlyApiError(message: string): string {
+  const payload = parseYouCamErrorPayload(message);
+  // Prefer the structured code; fall back to a code found in the raw text.
+  const errorCode = payload?.error ?? extractErrorCode(message);
 
   // Network / connectivity failures: only reachable on the results step (the
   // live API fetch). Report a friendly, actionable message instead of the raw
@@ -79,6 +104,11 @@ function friendlyApiError(message: string): string {
   if (normalized.includes('timeout') || normalized.includes('timed out') || normalized.includes('aborted')) {
     return 'The analysis took too long and timed out. Please try again with a different photo.';
   }
+  // Misconfigured deployment (common on static hosts like Cloudflare Pages):
+  // live mode is on but the NEXT_PUBLIC_* credentials were not in the build.
+  if (normalized.includes('credentials missing')) {
+    return 'Live analysis is not configured for this deployment: the app is in live mode, but its API keys were not available when this build was made. Set NEXT_PUBLIC_YOUCAM_API_KEY and NEXT_PUBLIC_YOUCAM_API_URL, then redeploy.';
+  }
 
   const messages: Record<string, string> = {
     // Face position and orientation errors
@@ -94,6 +124,34 @@ function friendlyApiError(message: string): string {
       'Your face is too large or partly outside the frame. Adjust your position and retake.',
     error_multiple_faces:
       'Multiple faces detected. Ensure only one person is in the frame and try again.',
+
+    // Real YouCam task-error codes (task errors nest under data.error).
+    // The src_ prefix is the input image on skin analysis; dst_ appears on
+    // VTO tasks. Face-too-small means the face is under ~60% of image width.
+    error_src_face_too_small:
+      'Move closer to the camera — your face should fill most of the photo (at least 60% of the width).',
+    error_dst_face_too_small:
+      'Move closer to the camera — your face should fill most of the photo (at least 60% of the width).',
+    error_face_too_small:
+      'Move closer to the camera — your face should fill most of the photo (at least 60% of the width).',
+    error_src_face_angle_invalid:
+      'Keep your head straight and face the camera directly.',
+    error_dst_face_angle_invalid:
+      'Keep your head straight and face the camera directly.',
+    error_src_face_position_invalid:
+      'Make sure your entire face is fully visible in the frame.',
+    error_dst_face_position_invalid:
+      'Make sure your entire face is fully visible in the frame.',
+    error_src_face_out_of_boundary:
+      'Your face is partly outside the frame. Move back slightly so your whole face shows.',
+    error_dst_face_out_of_boundary:
+      'Your face is partly outside the frame. Move back slightly so your whole face shows.',
+    error_src_face_not_detected:
+      'No face was detected. Use a clear, front-facing photo of your face.',
+    error_dst_face_not_detected:
+      'No face was detected. Use a clear, front-facing photo of your face.',
+    error_face_not_detected:
+      'No face was detected. Use a clear, front-facing photo of your face.',
     
     // Image quality and size errors
     error_below_min_image_size:
@@ -154,30 +212,51 @@ function friendlyApiError(message: string): string {
     return messages[errorCode];
   }
 
-  // Handle JSON error messages without specific codes
-  if (errorData?.error_message) {
-    // Check for common patterns in error messages
-    const errorMsg = errorData.error_message.toLowerCase();
-    if (errorMsg.includes('too small') || errorMsg.includes('resolution')) {
-      return 'The image is too low-resolution. Move closer to the camera or upload a larger photo.';
-    }
-    if (errorMsg.includes('too large')) {
-      return 'The image is too large. Upload a smaller photo.';
-    }
-    if (errorMsg.includes('face') && (errorMsg.includes('angle') || errorMsg.includes('tilt'))) {
-      return 'Your face is turned or tilted too far. Look straight at the camera and keep your head upright.';
-    }
-    if (errorMsg.includes('position')) {
-      return 'Make sure your entire face is fully visible in the frame.';
-    }
-    if (errorMsg.includes('blur')) {
-      return 'The image is blurry. Hold your camera steady and take a clear photo.';
-    }
-    if (errorMsg.includes('light')) {
-      return 'Poor lighting detected. Ensure you\'re in a well-lit area and face the light source.';
-    }
+  // Pattern-match against the API's plain-English error_message (falling back
+  // to the raw text) so unmapped codes still produce friendly guidance.
+  // NOTE: face-specific checks run before generic size checks.
+  const detail = (payload?.error_message ?? message).toLowerCase();
+  if (detail.includes('too small') && detail.includes('face')) {
+    return 'Move closer to the camera — your face should fill most of the photo (at least 60% of the width).';
+  }
+  if (detail.includes('too small') || detail.includes('resolution')) {
+    return 'The image is too low-resolution. Move closer to the camera or upload a larger photo.';
+  }
+  if (detail.includes('too large')) {
+    return 'The image is too large. Upload a smaller photo.';
+  }
+  if (
+    detail.includes('face') &&
+    (detail.includes('angle') || detail.includes('tilt') || detail.includes('turned'))
+  ) {
+    return 'Your face is turned or tilted too far. Look straight at the camera and keep your head upright.';
+  }
+  if (detail.includes('multiple face') || detail.includes('more than one face')) {
+    return 'Multiple faces detected. Ensure only one person is in the frame and try again.';
+  }
+  if (detail.includes('no face') || detail.includes('face not detect')) {
+    return 'No face was detected. Use a clear, front-facing photo of your face.';
+  }
+  if (detail.includes('position') || detail.includes('boundary')) {
+    return 'Make sure your entire face is fully visible in the frame.';
+  }
+  if (detail.includes('blur')) {
+    return 'The image is blurry. Hold your camera steady and take a clear photo.';
+  }
+  if (detail.includes('light')) {
+    return 'Poor lighting detected. Ensure you\'re in a well-lit area and face the light source.';
   }
 
+  // Unmapped code with a human-readable API message: use it verbatim — it is
+  // still far friendlier than raw JSON.
+  if (payload?.error_message) {
+    return payload.error_message;
+  }
+
+  // Never leak raw JSON to the user.
+  if (message.trim().startsWith('{') || message.includes('{"')) {
+    return 'Unable to analyze the image. Please try a different photo.';
+  }
   // Fallback to original message or generic error
   return message || 'Unable to analyze the image. Please try a different photo.';
 }

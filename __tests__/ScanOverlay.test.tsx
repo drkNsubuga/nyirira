@@ -63,4 +63,43 @@ describe('ScanOverlay', () => {
     render(<ScanOverlay imageData={PHOTO} progress={150} />);
     expect(screen.getByTestId('scan-progress-label')).toHaveTextContent('100%');
   });
+
+  it('animates the beam via requestAnimationFrame with a bounded transform', () => {
+    render(<ScanOverlay imageData={PHOTO} progress={50} />);
+    const beam = document.querySelector(
+      'svg rect[fill="url(#beamGradient)"]',
+    ) as SVGRectElement;
+    expect(beam.style.transform).toBe('');
+
+    act(() => {
+      // 1s into the 3s cosine cycle.
+      jest.advanceTimersByTime(1000);
+    });
+
+    expect(beam.style.transform).toMatch(/translateY\(-?[\d.]+px\)/);
+    // Cosine curve keeps the beam inside the frame (small overshoot tolerance
+    // for the afterglow's half-height).
+    const y = parseFloat(
+      (beam.style.transform.match(/translateY\(([-\d.]+)px\)/) ?? ['', '0'])[1],
+    );
+    expect(y).toBeGreaterThanOrEqual(-0.03);
+    expect(y).toBeLessThanOrEqual(1.03);
+  });
+
+  it('highlights only the nodes near the beam, never all or none mid-scan', () => {
+    render(<ScanOverlay imageData={PHOTO} progress={50} />);
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    const hot = document.querySelectorAll('svg circle.scan-node-hot');
+    const cold = document.querySelectorAll('svg circle.scan-node:not(.scan-node-hot)');
+    // Every node keeps its base class; a subset is hot while the beam is mid-frame.
+    expect(hot.length + cold.length).toBe(
+      document.querySelectorAll('svg circle.scan-node').length,
+    );
+    expect(hot.length).toBeGreaterThan(0);
+    expect(cold.length).toBeGreaterThan(0);
+  });
 });

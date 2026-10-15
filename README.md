@@ -40,7 +40,7 @@ Nyirira is a mobile-responsive single-page web application built for the Ugandan
 
 ### 5. Animated Scan Experience
 - **Glowing facial mesh**: SVG mesh of ~39 landmarks reveals over the user's photo as the scan progresses
-- **Scanning beam**: Emerald beam sweeps top↔bottom (3s cycle) with an afterglow trail; nodes near the beam glow brighter
+- **Scanning beam**: 60fps cosine ping-pong sweep (zero-velocity at both ends — no snapping at reversal) with an afterglow trail; nodes near the beam ramp to a brighter glow via CSS transitions, all driven by `requestAnimationFrame` with zero React re-renders per frame
 - **Micro-copy progress**: Rotating status messages in 5 credibility-building phases (Preparing → Face Detection → Skin Analysis → Color Matching → Finalizing) driven by real progress — validation maps to 0–50%, the API call eases 50→95%, 100% on completion
 - **Viewfinder brackets + progress bar**: Sci-fi scanner aesthetic over the captured photo
 
@@ -82,6 +82,31 @@ pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Environment Variables & Deployment (Cloudflare Pages)
+
+The app ships as a **static export** (`output: "export"`). `NEXT_PUBLIC_*` variables are
+inlined into the bundle **at build time** — they are *not* read at runtime.
+
+| Variable | Purpose |
+| --- | --- |
+| `NEXT_PUBLIC_YOUCAM_API_KEY` | Perfect Corp API key (live analysis) |
+| `NEXT_PUBLIC_YOUCAM_API_URL` | API base URL, e.g. `https://yce-api-01.makeupar.com` |
+| `NEXT_PUBLIC_USE_REAL_API` | `true` = call the live API; `false`/unset = mock results |
+
+On Cloudflare Pages:
+
+1. Project → **Settings → Environment variables** → add the vars for **Production AND Preview**
+   (variables added after a build, or only in one environment, never reach the served bundle).
+2. **Redeploy** — the build must run *after* the vars exist.
+3. Do **not** put these in `wrangler.toml` `[vars]` — that is for Workers runtime config and is
+   ignored by this static export.
+4. `pnpm build` logs a loud `[nyirira] Live YouCam API enabled but credentials missing: ...`
+   warning if the build env is misconfigured, so check the build logs first.
+
+The in-app **Settings → "Use live API"** toggle can also enable live mode per-browser; if the
+built bundle has no credentials, the app shows a clear "not configured for this deployment"
+message instead of raw errors.
 
 ## Project Structure
 
