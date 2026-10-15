@@ -81,7 +81,29 @@ describe('CameraCapture', () => {
     expect(onImageCapture).toHaveBeenCalledTimes(1);
   });
 
-  it('returns to camera mode when Retake is clicked', async () => {
+  it('attaches the media stream to the video element when camera mode opens', async () => {
+    const fakeTrack = { stop: jest.fn() };
+    const fakeStream = { getTracks: () => [fakeTrack] };
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        getUserMedia: jest.fn().mockResolvedValue(fakeStream),
+      },
+      configurable: true,
+    });
+
+    render(<CameraCapture onImageCapture={() => {}} />);
+    fireEvent.click(screen.getByText('Take Photo'));
+
+    // Camera mode opens: Capture/Cancel controls render and the stream is
+    // attached to the (now mounted) <video> element via effect.
+    const video = (await screen.findByText('Capture'))
+      .closest('.bg-slate-900')
+      ?.querySelector('video') as HTMLVideoElement;
+    expect(video).toBeTruthy();
+    await waitFor(() => expect(video.srcObject).toBe(fakeStream));
+  });
+
+  it('returns to the original selection screen when Retake is clicked', async () => {
     render(<CameraCapture onImageCapture={() => {}} />);
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
 
@@ -90,8 +112,11 @@ describe('CameraCapture', () => {
 
     const retake = await screen.findByText('Retake');
     fireEvent.click(retake);
-    // Back in camera mode: Capture + Cancel controls are present.
-    expect(await screen.findByText('Capture')).toBeInTheDocument();
+    // Back on the ORIGINAL screen: Take Photo + Upload choices, no preview.
+    expect(await screen.findByText('Take Photo')).toBeInTheDocument();
+    expect(screen.getByText('Upload')).toBeInTheDocument();
+    expect(screen.queryByText('Retake')).not.toBeInTheDocument();
+    expect(screen.queryByText('Capture')).not.toBeInTheDocument();
   });
 
   it('shows a not-supported message when the camera is unavailable', async () => {

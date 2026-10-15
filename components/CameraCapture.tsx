@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Camera, Upload, AlertCircle } from 'lucide-react';
 import { CameraError } from '@/lib/types';
 import { validateImageFile } from '@/lib/imageValidation';
@@ -18,6 +18,30 @@ export default function CameraCapture({ onImageCapture }: CameraCaptureProps) {
   const [error, setError] = useState<CameraError | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
+  // Mirror the stream in a ref so the unmount cleanup (which closes over the
+  // first render's values) can always stop the CURRENT stream.
+  const streamRef = useRef<MediaStream | null>(null);
+  useEffect(() => {
+    streamRef.current = stream;
+  }, [stream]);
+
+  // Attach the stream to the <video> element via effect: the element only
+  // exists once mode === 'camera', so assigning srcObject inside startCamera
+  // (before the re-render) would silently do nothing and show a black frame.
+  useEffect(() => {
+    if (mode === 'camera' && stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [mode, stream]);
+
+  // Always release the camera when the component unmounts (e.g. analysis
+  // starts) so the browser's recording indicator turns off.
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
   const startCamera = async () => {
     setError(null);
     try {
@@ -25,9 +49,6 @@ export default function CameraCapture({ onImageCapture }: CameraCaptureProps) {
         video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
       });
       setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
       setMode('camera');
     } catch (err) {
       const errorObject = err as { name?: string; message?: string };
@@ -111,8 +132,16 @@ export default function CameraCapture({ onImageCapture }: CameraCaptureProps) {
   };
 
   const retakePhoto = () => {
+    // Discard the captured image and return to the ORIGINAL selection screen
+    // (Take Photo / Upload) — same UI the user first saw. Also stop the live
+    // stream so the camera indicator turns off until re-enabled.
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+      setStream(null);
+    }
     setCapturedImage(null);
-    setMode('camera');
+    setError(null);
+    setMode('select');
   };
 
   if (mode === 'select') {

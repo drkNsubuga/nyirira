@@ -473,6 +473,15 @@ export default function Home() {
 
   // Discard the failed image and return to a fresh camera/upload flow.
   const handleStartOver = () => {
+    // Also clear `restored`: otherwise viewStep falls back to the stored
+    // analysis and immediately snaps back to the old results screen.
+    setRestored(false);
+    setState({ ...defaultState });
+  };
+
+  // Brand-name click: always return to the original home/capture screen.
+  const handleGoHome = () => {
+    setRestored(false);
     setState({ ...defaultState });
   };
 
@@ -495,12 +504,17 @@ export default function Home() {
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-emerald-50 to-amber-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <header className="sticky top-0 z-40 bg-white shadow-sm dark:bg-slate-900">
         <div className="max-w-4xl mx-auto px-4 py-6 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleGoHome}
+            aria-label="Go to home"
+            className="flex items-center gap-3 text-left"
+          >
             <Sparkles className="w-6 h-6 text-emerald-600" />
             <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-amber-600 bg-clip-text text-transparent">
               Nyirira
             </h1>
-          </div>
+          </button>
           <Link
             href="/settings"
             className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"

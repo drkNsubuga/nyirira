@@ -335,6 +335,23 @@ describe('Home page', () => {
     expect(analyzeImage).not.toHaveBeenCalled();
   });
 
+  it('returns to the home capture screen when the brand name is clicked', async () => {
+    // Start from a completed analysis (results screen).
+    render(<Home />);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['bytes'], 'selfie.jpg', { type: 'image/jpeg' });
+    (analyzeImage as jest.Mock).mockResolvedValueOnce(makeAnalysis(72));
+    fireEvent.change(fileInput, { target: { files: [file] } });
+    fireEvent.click(await screen.findByText('Analyze'));
+    await screen.findByText(/Health Score/i);
+
+    // Click the brand name → back on the original capture screen.
+    fireEvent.click(screen.getByRole('button', { name: /go to home/i }));
+    await screen.findByText('Take Photo');
+    expect(screen.getByText('Upload')).toBeInTheDocument();
+    expect(screen.queryByText(/Health Score/i)).not.toBeInTheDocument();
+  });
+
   it('returns to the camera flow when Take new photo is clicked after an error', async () => {
     (analyzeImage as jest.Mock).mockRejectedValueOnce(
       new Error('Task failed: {"error":"error_below_min_image_size","task_status":"error"}')
