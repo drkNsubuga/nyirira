@@ -81,4 +81,6 @@ export interface AppState {
   isLoading: boolean;
   validationProgress: number;
   validationMessage: string;
+  /** Overall scan progress (0-100) combining validation + API analysis phases. */
+  scanProgress: number;
 }

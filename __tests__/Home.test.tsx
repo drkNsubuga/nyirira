@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import Home from '@/app/page';
 import { saveAnalysis, saveAnalysisHistory, getAnalysisHistory } from '@/lib/storage';
 import { AnalysisResponse } from '@/lib/types';
@@ -164,6 +164,35 @@ describe('Home page', () => {
     // Nothing was persisted to history.
     expect(getAnalysisHistory()).toEqual([]);
   });
+
+  it('shows the animated scan overlay while analysis is in progress', async () => {
+    let resolveAnalyze: (value: AnalysisResponse) => void = () => {};
+    (analyzeImage as jest.Mock).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveAnalyze = resolve;
+      }),
+    );
+
+    render(<Home />);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['bytes'], 'selfie.jpg', { type: 'image/jpeg' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    fireEvent.click(await screen.findByText('Analyze'));
+
+    // The photo is shown with the scan overlay while the API call is in flight.
+    await screen.findByTestId('scan-overlay');
+    expect(screen.getByText(/Analyzing Your Skin/i)).toBeInTheDocument();
+
+    // Finish the analysis → results render and the overlay is gone.
+    await act(async () => {
+      resolveAnalyze(makeAnalysis(72));
+    });
+
+    await screen.findByText(/Health Score/i);
+    expect(screen.queryByTestId('scan-overlay')).not.toBeInTheDocument();
+  });
+
 
   it('renders the footer disclaimer', () => {
     render(<Home />);

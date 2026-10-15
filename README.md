@@ -36,8 +36,15 @@ Nyirira is a mobile-responsive single-page web application built for the Ugandan
 - **ML-powered validation**: TensorFlow.js face detection, Tesseract.js privacy checks
 - **Offline error processing**: Comprehensive error code mapping with fallback messages
 - **Real-time feedback**: Validation progress indicators and specific guidance
+- **All errors at once**: The alert lists every validation issue found, not just the first
 
-### 5. Client-Side Data Persistence
+### 5. Animated Scan Experience
+- **Glowing facial mesh**: SVG mesh of ~39 landmarks reveals over the user's photo as the scan progresses
+- **Scanning beam**: Emerald beam sweeps top↔bottom (3s cycle) with an afterglow trail; nodes near the beam glow brighter
+- **Micro-copy progress**: Rotating status messages in 5 credibility-building phases (Preparing → Face Detection → Skin Analysis → Color Matching → Finalizing) driven by real progress — validation maps to 0–50%, the API call eases 50→95%, 100% on completion
+- **Viewfinder brackets + progress bar**: Sci-fi scanner aesthetic over the captured photo
+
+### 6. Client-Side Data Persistence
 - Results saved to browser localStorage
 - Recent History list on the capture screen with one-tap reopen
 - Clear history option to remove all saved scans at once

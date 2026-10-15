@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { AlertCircle, Camera, Clock3, Download, Loader2, RotateCcw, Share2, Settings, Sparkles, Trash2, X } from 'lucide-react';
 import CameraCapture from '@/components/CameraCapture';
 import AnalysisDashboard from '@/components/AnalysisDashboard';
+import ScanOverlay from '@/components/ScanOverlay';
 import HistoryCompare from '@/components/HistoryCompare';
 import Toast, { ToastMessage } from '@/components/Toast';
 import { AppState, AnalysisResponse } from '@/lib/types';
@@ -36,6 +37,7 @@ const defaultState: AppState = {
   isLoading: false,
   validationProgress: 0,
   validationMessage: '',
+  scanProgress: 0,
 };
 
 /**
@@ -203,10 +205,6 @@ export default function Home() {
   const setValidationProgress = (progress: number) => {
     setState(prev => ({ ...prev, validationProgress: progress }));
   };
-  
-  const setValidationMessage = (message: string) => {
-    setState(prev => ({ ...prev, validationMessage: message }));
-  };
 
   const analysis = state.analysis ?? (restored ? storedAnalysis : null);
   const viewStep: AppState['step'] =
@@ -277,18 +275,26 @@ export default function Home() {
       isLoading: true,
       error: null,
       errorList: null,
+      scanProgress: 0,
     }));
+
+    // Timer to animate scan progress during the API call phase (50-95%).
+    let scanTimer: ReturnType<typeof setInterval> | null = null;
 
     try {
       // Comprehensive validation (size, resolution, face, quality, privacy) 
       // — fail fast with friendly messages instead of burning API credits on
       // doomed images. All processing happens client-side for privacy.
-      setValidationProgress(0);
-      setValidationMessage('Validating image...');
-      
+      setState((prev) => ({ ...prev, scanProgress: 2 }));
+
       const validation = await runFullImageValidation(imageData, (progress, message) => {
-        setValidationProgress(progress);
-        setValidationMessage(message);
+        // Validation maps to the first half of the scan overlay progress.
+        setState((prev) => ({
+          ...prev,
+          validationProgress: progress,
+          validationMessage: message,
+          scanProgress: Math.round(2 + (progress / 100) * 48),
+        }));
       });
       
       if (!validation.valid) {
@@ -312,7 +318,23 @@ export default function Home() {
       // blow past the localStorage quota (SRS NF1.4 + FR4.1).
       const compressed = await compressImage(imageData);
 
+      // API phase: ease the overlay progress from 50 → 95% while the request
+      // is in flight so the scan overlay reads as live progress.
+      setState((prev) => ({ ...prev, scanProgress: 50 }));
+      scanTimer = setInterval(() => {
+        setState((prev) => ({
+          ...prev,
+          scanProgress: Math.min(prev.scanProgress + 1, 95),
+        }));
+      }, 200);
+
       const result = await analyzeImage(compressed);
+
+      if (scanTimer) {
+        clearInterval(scanTimer);
+        scanTimer = null;
+      }
+      setState((prev) => ({ ...prev, scanProgress: 100 }));
 
       // Never surface empty/incomplete results — treat a malformed response as a
       // failure so the user sees the friendly alert + their photo, not a blank
@@ -359,6 +381,9 @@ export default function Home() {
         // Keep imageData so the user can retry the same photo or retake —
         // the original image stays visible in the error alert.
       }));
+    } finally {
+      // Always stop the progress timer, whatever the outcome.
+      if (scanTimer) clearInterval(scanTimer);
     }
   };
 
@@ -383,6 +408,7 @@ export default function Home() {
       isLoading: false,
       validationProgress: 0,
       validationMessage: '',
+      scanProgress: 0,
     });
   };
 
@@ -546,28 +572,18 @@ export default function Home() {
           )}
 
           {viewStep === 'processing' && (
-            <div className="flex flex-col items-center justify-center py-12">
-              <div className="mb-6">
-                <Loader2 className="w-12 h-12 text-emerald-600 animate-spin" />
-              </div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-2">Analyzing Your Skin</h2>
+            <div className="flex flex-col items-center justify-center py-6">
+              {state.imageData ? (
+                <ScanOverlay imageData={state.imageData} progress={state.scanProgress} />
+              ) : (
+                <div className="mb-6">
+                  <Loader2 className="w-12 h-12 text-emerald-600 animate-spin" />
+                </div>
+              )}
+              <h2 className="text-2xl font-bold text-slate-900 mt-6 mb-2">Analyzing Your Skin</h2>
               <p className="text-slate-600 text-center max-w-md">
                 Our AI is processing your image to provide personalized skincare recommendations optimized for melanin-rich skin (Fitzpatrick V-VI).
               </p>
-              <div className="mt-6 space-y-2 max-w-md">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-emerald-600 rounded-full animate-pulse" />
-                  <p className="text-sm text-slate-600">Detecting skin conditions...</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-emerald-600 rounded-full animate-pulse delay-100" />
-                  <p className="text-sm text-slate-600">Analyzing texture & tone...</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-emerald-600 rounded-full animate-pulse delay-200" />
-                  <p className="text-sm text-slate-600">Generating color recommendations...</p>
-                </div>
-              </div>
             </div>
           )}
 
