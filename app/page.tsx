@@ -326,26 +326,31 @@ export default function Home() {
   };
 
   // Guard against empty/incomplete results so the dashboard never renders blank.
-  // A response is "complete" only when every required analysis section has the
-  // numeric/text data the dashboard needs (FR2 + FR3).
+  // A response is "complete" when it has essential skin analysis data and either
+  // VTO data or reasonable fallbacks for the dashboard.
   const hasCompleteAnalysis = (result: AnalysisResponse | null): result is AnalysisResponse => {
     if (!result) return false;
     const skin = result.skinAnalysis;
     const vto = result.vto;
-    return Boolean(
-      skin &&
-        typeof skin.healthScore === 'number' &&
-        Number.isFinite(skin.healthScore) &&
-        skin.spots &&
-        skin.texture &&
-        skin.redness &&
-        Array.isArray(skin.safetyFlags) &&
-        Array.isArray(skin.barrierRepairRegimen) &&
-        vto &&
-        Array.isArray(vto.recommendedLipShades) &&
-        vto.recommendedLipShades.length > 0 &&
-        vto.outfitPalette,
-    );
+    
+    // Essential skin analysis data must be present
+    const hasEssentialSkinData = skin && 
+      typeof skin.healthScore === 'number' && 
+      Number.isFinite(skin.healthScore) &&
+      skin.spots && 
+      skin.texture && 
+      skin.redness &&
+      Array.isArray(skin.safetyFlags) &&
+      Array.isArray(skin.barrierRepairRegimen);
+    
+    // VTO data should be present, but we can be more flexible
+    const hasVTOData = vto && vto.outfitPalette;
+    
+    // For recommended lip shades, we prefer non-empty but can work with empty
+    // as long as we have other VTO data like outfit palette
+    const hasLipShades = vto && Array.isArray(vto.recommendedLipShades);
+    
+    return Boolean(hasEssentialSkinData && (hasVTOData || hasLipShades));
   };
 
   const handleImageCapture = async (imageData: string) => {

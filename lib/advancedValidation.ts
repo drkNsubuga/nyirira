@@ -27,9 +27,14 @@ function ensureBackend(): Promise<void> {
       for (const name of preferred) {
         try {
           if (tf.engine().registryFactory[name as 'webgl' | 'cpu'] || tf.findBackend(name)) {
-            await tf.setBackend(name);
-            await tf.ready();
-            return;
+            try {
+              await tf.setBackend(name);
+              await tf.ready();
+              return;
+            } catch (error) {
+              console.warn(`Failed to set backend ${name}:`, error);
+              // Continue to next backend
+            }
           }
         } catch {
           // Try the next candidate.
