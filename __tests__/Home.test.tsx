@@ -68,15 +68,15 @@ describe('Home page', () => {
     expect(screen.getByText('Upload')).toBeInTheDocument();
   });
 
-  it('restores saved results when an analysis exists in storage', () => {
+  it('stays on the capture screen after reload even when a saved analysis exists in storage', () => {
+    // Simulates a page refresh: interactive state is gone, only localStorage
+    // remains. The app must boot to the original capture screen, NOT results.
     saveAnalysis(makeAnalysis(81));
     render(<Home />);
-    // Dashboard renders the stored health score in the main score card.
-    expect(screen.getByText(/Health Score/i)).toBeInTheDocument();
-    // Use getAllByText and check the first one (main score card)
-    expect(screen.getAllByText('81')[0]).toBeInTheDocument();
-    // Export + Share actions are available on the results view.
-    expect(screen.getByText('Export image')).toBeInTheDocument();
+    expect(screen.getByText('Take Photo')).toBeInTheDocument();
+    expect(screen.getByText('Upload')).toBeInTheDocument();
+    expect(screen.queryByText(/Health Score/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Export image')).not.toBeInTheDocument();
   });
 
   it('shows recent history on the capture screen', () => {

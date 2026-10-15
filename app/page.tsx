@@ -10,13 +10,11 @@ import HistoryCompare from '@/components/HistoryCompare';
 import Toast, { ToastMessage } from '@/components/Toast';
 import { AppState, AnalysisResponse } from '@/lib/types';
 import {
-  ANALYSIS_KEY,
   HISTORY_KEY,
   SETTINGS_KEY,
   addAnalysisToHistory,
   clearAnalysisHistory,
   removeAnalysisFromHistory,
-  parseAnalysis,
   parseHistory,
   parseSettings,
   saveAnalysis,
@@ -267,14 +265,13 @@ export default function Home() {
   // server-rendered markup always matches the client's hydration render —
   // no hydration mismatch — and React re-renders with the stored values right
   // after hydration without a manual setState-in-effect.
-  const storedAnalysis = parseAnalysis(useLocalStorageValue(ANALYSIS_KEY));
   const history = parseHistory(useLocalStorageValue(HISTORY_KEY));
   const settings = parseSettings(useLocalStorageValue(SETTINGS_KEY));
 
-  // Interactive state (capture/processing/results) stays in useState; the
-  // restored analysis is only used until the user explicitly starts over.
+  // Interactive state (capture/processing/results) stays in useState.
+  // No restore-on-reload: a page refresh always lands on the original capture
+  // screen (the latest run is still reachable via Recent History below it).
   const [state, setState] = useState<AppState>(defaultState);
-  const [restored, setRestored] = useState(true);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   
   // Destructure validation state for easier access
@@ -285,7 +282,9 @@ export default function Home() {
     setState(prev => ({ ...prev, validationProgress: progress }));
   };
 
-  const analysis = state.analysis ?? (restored ? storedAnalysis : null);
+  // Latest analysis only from the live flow — never from localStorage, so
+  // reloading the page shows the capture screen instead of old results.
+  const analysis = state.analysis;
   const viewStep: AppState['step'] =
     state.step === 'capture' && analysis ? 'results' : state.step;
 
@@ -377,7 +376,6 @@ export default function Home() {
       });
       
       if (!validation.valid) {
-        setRestored(false);
         const errorMessages = validation.errors?.length
           ? validation.errors
           : [validation.message ?? 'The selected image cannot be analyzed.'];
@@ -419,7 +417,6 @@ export default function Home() {
       // failure so the user sees the friendly alert + their photo, not a blank
       // dashboard. This keeps every "results" render backed by real data.
       if (!hasCompleteAnalysis(result)) {
-        setRestored(false);
         setState((prev) => ({
           ...prev,
           error: 'The analysis returned no usable results. Please try a clearer photo.',
@@ -449,8 +446,6 @@ export default function Home() {
       }));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-      // Drop the restored analysis so the error alert isn't masked by stale results.
-      setRestored(false);
       setState((prev) => ({
         ...prev,
         error: friendlyApiError(errorMessage),
@@ -473,20 +468,15 @@ export default function Home() {
 
   // Discard the failed image and return to a fresh camera/upload flow.
   const handleStartOver = () => {
-    // Also clear `restored`: otherwise viewStep falls back to the stored
-    // analysis and immediately snaps back to the old results screen.
-    setRestored(false);
     setState({ ...defaultState });
   };
 
   // Brand-name click: always return to the original home/capture screen.
   const handleGoHome = () => {
-    setRestored(false);
     setState({ ...defaultState });
   };
 
   const handleBack = () => {
-    setRestored(false);
     setState({
       step: 'capture',
       imageData: null,
