@@ -30,6 +30,11 @@ const nextConfig: NextConfig = {
   // Fully static build: emits ./out with a real index.html so it can be
   // served as-is by Cloudflare Pages (build output directory = "out").
   output: "export",
+  // Disable Next.js Image Optimization API (incompatible with output: "export").
+  // <Image /> tags will render as plain  with the src passed through.
+  images: {
+    unoptimized: true,
+  },
   // NOTE: `cacheComponents` and `partialPrefetching` (PPR) are incompatible
   // with `output: "export"`. This app is fully client-rendered, so neither
   // provides benefit here — static export is what Cloudflare Pages serves.
