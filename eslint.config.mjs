@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated artifacts and dependency output should not be linted:
+    "coverage/**",
+    "node_modules/**",
   ]),
 ]);
 

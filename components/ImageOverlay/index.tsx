@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw, Info } from 'lucide-react';
+import Image from 'next/image';
 import { AnalysisResponse } from '@/lib/types';
 
 interface SkinConditionMarker {
@@ -87,9 +88,20 @@ export default function ImageOverlay({ analysis, imageData, className = '' }: Im
 
   return (
     <div className={`relative ${className}`}>
-      <div className='relative overflow-hidden rounded-lg bg-gray-100'>
+      <div className='relative flex justify-center overflow-hidden rounded-lg bg-gray-100'>
         <div className='relative transition-transform duration-200' style={{ transform: `scale(${zoom})` }}>
-          <img src={imageData} alt='Skin analysis' className='w-full h-auto' style={{ maxHeight: '600px' }} />
+          {/* Fit inside the box while preserving the aspect ratio — a forced
+              w-full + max-height stretches tall portrait selfies. h/w-auto with
+              max constraints scales the image down without distorting it, and
+              the wrapper stays image-sized so the % markers line up. */}
+          <Image
+            src={imageData}
+            alt='Skin analysis'
+            width={600}
+            height={800}
+            className='block h-auto w-auto max-h-[600px] max-w-full object-contain'
+            sizes="(max-width: 600px) 100vw, 600px"
+          />
           <div className='absolute inset-0'>
             {markers.map((marker) => (
               <div key={marker.id} className={`absolute cursor-pointer transition-all duration-200 hover:scale-110 ${selectedMarker?.id === marker.id ? 'ring-4 ring-blue-400 z-10' : ''}`} style={{ left: `${marker.x}%`, top: `${marker.y}%`, transform: 'translate(-50%, -50%)', width: `${marker.size}px`, height: `${marker.size}px`, backgroundColor: getMarkerColor(marker.type), border: getMarkerBorder(marker.type), borderRadius: '50%' }} onClick={() => handleMarkerClick(marker)}>

@@ -47,6 +47,10 @@ const sampleAnalysis: AnalysisResponse = {
 };
 
 describe('AnalysisDashboard', () => {
+  const openTab = (name: string) => {
+    fireEvent.click(screen.getByRole('tab', { name }));
+  };
+
   it('renders the health score', () => {
     render(<AnalysisDashboard analysis={sampleAnalysis} onBack={() => {}} imageData="test-image-data" />);
     // Find the health score within the score circle container
@@ -56,18 +60,21 @@ describe('AnalysisDashboard', () => {
 
   it('renders safety flags and recommendations', () => {
     render(<AnalysisDashboard analysis={sampleAnalysis} onBack={() => {}} imageData="test-image-data" />);
+    openTab('Safety & Regimen');
     expect(screen.getByText('Avoid Bleaching Agents')).toBeInTheDocument();
     expect(screen.getByText(/niacinamide and daily sunscreen/i)).toBeInTheDocument();
   });
 
   it('renders the barrier repair regimen with East African availability notes', () => {
     render(<AnalysisDashboard analysis={sampleAnalysis} onBack={() => {}} imageData="test-image-data" />);
+    openTab('Safety & Regimen');
     expect(screen.getByText('Niacinamide Serum')).toBeInTheDocument();
     expect(screen.getByText(/East African pharmacies/i)).toBeInTheDocument();
   });
 
   it('renders recommended lip shades and the color palette', () => {
     render(<AnalysisDashboard analysis={sampleAnalysis} onBack={() => {}} imageData="test-image-data" />);
+    openTab('Harmonized Look');
     expect(screen.getByText('Terracotta')).toBeInTheDocument();
     expect(screen.getByText('Plum')).toBeInTheDocument();
     expect(screen.getByText('Kitenge-inspired')).toBeInTheDocument();

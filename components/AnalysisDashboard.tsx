@@ -2,8 +2,11 @@
 
 import ImageOverlay from './ImageOverlay';
 import { AnalysisResponse } from '@/lib/types';
+import React from 'react';
+import Image from 'next/image';
 import { AlertTriangle, CheckCircle, Leaf, Palette, Shield, ArrowLeft } from 'lucide-react';
 import { ANALYSIS_KEY } from '@/lib/storage';
+import { harmonizedLookLead } from '@/lib/recommendations';
 
 interface AnalysisDashboardProps {
   analysis: AnalysisResponse;
@@ -13,6 +16,59 @@ interface AnalysisDashboardProps {
   onSaved?: () => void;
 }
 
+// ---------- Lightweight, dependency-free Tabs (no shadcn/ui in this project) ----------
+type TabItem = React.ReactElement<{ value: string; children?: React.ReactNode }>;
+
+function Tabs({ children, defaultValue, className }: { children: React.ReactNode; defaultValue: string; className?: string }) {
+  const [value, setValue] = React.useState(defaultValue);
+  const triggers = React.Children.toArray(children).filter((c): c is TabItem => React.isValidElement(c) && c.type === TabTrigger);
+  const contents = React.Children.toArray(children).filter((c): c is TabItem => React.isValidElement(c) && c.type === TabContent);
+
+  return (
+    <div className={className}>
+      <div role="tablist" className="flex border-b border-slate-200 mb-8">
+        {triggers.map((trigger) => {
+          const id = trigger.props.value;
+          const active = value === id;
+          return (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={active}
+              id={`tab-${id}`}
+              onClick={() => setValue(id)}
+              className={`-mb-px px-4 py-3 text-sm font-medium border-b-2 transition-all ${
+                active
+                  ? 'border-emerald-600 text-emerald-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              {trigger.props.children}
+            </button>
+          );
+        })}
+      </div>
+      <div className="space-y-6">
+        {contents.map((content) => {
+          const id = content.props.value;
+          return value === id ? (
+            <div key={id} role="tabpanel" aria-labelledby={`tab-${id}`} tabIndex={0} className="tab-panel">
+              {content.props.children}
+            </div>
+          ) : null;
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TabTrigger({ }: { children: React.ReactNode; value: string }) {
+  return null;
+}
+
+function TabContent({ }: { children: React.ReactNode; value: string }) {
+  return null;
+}
 export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved }: AnalysisDashboardProps) {
   const { skinAnalysis, vto } = analysis;
 
@@ -39,8 +95,15 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
         Back
       </button>
 
-      {/* Skin Health Score Card */}
-      <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-8 mb-6 shadow-lg dark:from-slate-800 dark:to-slate-900">
+      <Tabs defaultValue="results" className="mb-2">
+        <TabTrigger value="results">Analysis Results</TabTrigger>
+        <TabTrigger value="safety">Safety &amp; Regimen</TabTrigger>
+        <TabTrigger value="look">Harmonized Look</TabTrigger>
+
+        {/* ===== Tab 1: Analysis Results ===== */}
+        <TabContent value="results">
+          {/* Skin Health Score Card */}
+          <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-8 mb-8 shadow-lg dark:from-slate-800 dark:to-slate-900">
         <h2 className="text-2xl font-bold text-slate-900 mb-6">Skin Health & Safety Score</h2>
 
         {/* Image Overlay with Skin Condition Markers */}
@@ -113,8 +176,11 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
           </div>
         </div>
       </div>
+        </TabContent>
 
-      {/* Safety Flags */}
+        {/* ===== Tab 2: Safety & Regimen ===== */}
+        <TabContent value="safety">
+          {/* Safety Flags */}
       {skinAnalysis.safetyFlags.length > 0 && (
         <div className="mb-6">
           <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
@@ -180,24 +246,29 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
           ))}
         </div>
       </div>
+        </TabContent>
 
-      {/* VTO Harmonized Look */}
-      <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-2xl p-8 mb-6 shadow-lg border-2 border-amber-200 dark:from-amber-950/50 dark:to-slate-900 dark:border-amber-900">
-        <h3 className="text-xl font-bold text-amber-900 mb-4 flex items-center gap-2">
-          <Palette className="w-5 h-5" />
-          Your Harmonized Look
-        </h3>
-
-        <p className="text-amber-900 mb-6">{vto.description}</p>
+        {/* ===== Tab 3: Harmonized Look ===== */}
+        <TabContent value="look">
+          <div className="mb-6">
+            <h3 className="text-xl font-bold text-slate-900 mb-3 flex items-center gap-2">
+              <Palette className="w-5 h-5 text-amber-600" />
+              Harmonized Look
+            </h3>
+            <p className="text-slate-700 leading-relaxed">{harmonizedLookLead(skinAnalysis)}</p>
+          </div>
 
         {/* Live look-vto result — the actual rendered virtual try-on image. */}
         {vto.tryOnImageUrl && (
           <div className="mb-6">
             <p className="text-sm font-semibold text-amber-900 mb-3">Live Virtual Try-On</p>
-            <img
+            <Image
               src={vto.tryOnImageUrl}
               alt="Your virtual try-on result"
+              width={400}
+              height={500}
               className="w-full max-w-sm rounded-xl border-2 border-amber-300 shadow-md"
+              sizes="(max-width: 640px) 100vw, 400px"
               onError={(e) => {
                 // The presigned result URL expires ~2h after the task completes.
                 (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
@@ -272,7 +343,8 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
             <p className="text-sm text-amber-800">No shade recommendations were saved with this result.</p>
           )}
         </div>
-      </div>
+      </TabContent>
+      </Tabs>
 
       {/* Save Results */}
       <div className="flex gap-4">

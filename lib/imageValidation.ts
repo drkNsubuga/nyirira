@@ -6,9 +6,6 @@
  * All processing happens client-side for privacy.
  */
 
-import * as blazeface from '@tensorflow-models/blazeface';
-import * as tf from '@tensorflow/tfjs';
-
 export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 export const MIN_SHORT_SIDE_PX = 480;
 export const MAX_LONG_SIDE_PX = 2560;

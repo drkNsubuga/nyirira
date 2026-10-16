@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { TrendingUp, Eye, Calendar } from 'lucide-react';
 import { AnalysisResponse } from '@/lib/types';
+import Image from 'next/image';
 import { AnalysisHistoryItem } from '@/lib/storage';
 
 interface HistoryCompareProps {
@@ -101,10 +102,12 @@ export default function HistoryCompare({ current, history, currentImageData }: H
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Image preview */}
               <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
-                <img
+                <Image
+                  fill
                   src={history.find(item => item.analysis.timestamp === previous.timestamp)?.imageData || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2ZmZmZmZiIvPjx0ZXh0IHg9IjQwMCIgeT0iMzAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuMiI+UGVyZmVjdDwvdGV4dD48L3N2Zz4='}
                   alt="Previous analysis"
                   className="w-full h-full object-cover"
+                  sizes="300px"
                 />
               </div>
               
@@ -146,10 +149,12 @@ export default function HistoryCompare({ current, history, currentImageData }: H
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Image preview */}
               <div className="aspect-square rounded-lg overflow-hidden bg-emerald-100">
-                <img
+                <Image
+                  fill
                   src={currentImageData}
                   alt="Current analysis"
                   className="w-full h-full object-cover"
+                  sizes="300px"
                 />
               </div>
               

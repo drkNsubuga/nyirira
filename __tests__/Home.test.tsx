@@ -4,8 +4,6 @@ import Home from '@/app/page';
 import { saveAnalysis, saveAnalysisHistory, getAnalysisHistory } from '@/lib/storage';
 import { AnalysisResponse } from '@/lib/types';
 import { analyzeImage } from '@/lib/youcamClient';
-import { compressImage } from '@/lib/image';
-import { validateImageResolution } from '@/lib/imageValidation';
 import { runFullImageValidation } from '@/lib/advancedValidation';
 
 jest.mock('@/lib/youcamClient', () => ({

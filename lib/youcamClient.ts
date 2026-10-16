@@ -4,6 +4,7 @@
  */
 
 import { getAppSettings } from './storage';
+import { buildBarrierRepairRegimen, buildSafetyFlags, SkinSnapshot } from './recommendations';
 import { AnalysisResponse, SkinAnalysisResult, VTOResult } from './types';
 
 export function shouldUseRealApi(): boolean {
@@ -101,7 +102,7 @@ function getMockAnalysis(imageData: string): Promise<AnalysisResponse> {
  * Mock skin analysis response optimized for Fitzpatrick V-VI (melanin-rich) skin
  */
 function getMockSkinAnalysis(): SkinAnalysisResult {
-  return {
+  const skin: SkinSnapshot = {
     healthScore: 72,
     spots: {
       count: 8,
@@ -120,51 +121,14 @@ function getMockSkinAnalysis(): SkinAnalysisResult {
       description:
         'Mild inflammation detected. Appears to be localized around nasolabial folds, consistent with sensitivity to environmental factors.',
     },
-    safetyFlags: [
-      {
-        id: 'bleaching-warning',
-        severity: 'critical',
-        title: '⚠️ Avoid Bleaching Agents',
-        description:
-          'Products containing hydroquinone, kojic acid, or mercury can damage melanin-rich skin and cause additional hyperpigmentation.',
-        recommendation:
-          'Focus on safe brighteners: niacinamide, vitamin C, and natural botanicals like turmeric.',
-      },
-      {
-        id: 'sun-protection',
-        severity: 'warning',
-        title: 'Sun Protection Essential',
-        description:
-          'UV exposure can worsen hyperpigmentation and uneven skin tone. SPF 50+ daily is critical.',
-        recommendation: 'Use broad-spectrum SPF 50+ daily. Reapply every 2 hours if outdoors.',
-      },
-    ],
-    barrierRepairRegimen: [
-      {
-        id: 'niacinamide',
-        name: 'Niacinamide Serum',
-        activeIngredients: ['Niacinamide (5%)', 'Hyaluronic Acid'],
-        frequency: 'Twice daily (AM/PM)',
-        notes:
-          'Strengthens skin barrier. Reduces inflammation. Available in East African pharmacies (e.g., CeraVe, Cocoa Brown).',
-      },
-      {
-        id: 'glycerin',
-        name: 'Glycerin + Shea Butter Moisturizer',
-        activeIngredients: ['Glycerin (10%)', 'Shea Butter', 'Coconut Oil'],
-        frequency: 'Daily, after cleansing',
-        notes:
-          'Natural barrier repair. Glycerin is affordable and widely available in local markets. Shea butter is traditionally used in Uganda.',
-      },
-      {
-        id: 'natural-oil',
-        name: 'Organic Argan or Jojoba Oil',
-        activeIngredients: ['Argan Oil', 'Jojoba Oil', 'Vitamin E'],
-        frequency: 'Evening, as occlusive layer',
-        notes:
-          'Rich in antioxidants. Apply as final step before sleep. Available locally or online (e.g., through WhatsApp vendors in Uganda).',
-      },
-    ],
+  };
+
+  // The mock measurements and the guidance derived from them stay in sync —
+  // same builder functions the live path uses (lib/recommendations.ts).
+  return {
+    ...skin,
+    safetyFlags: buildSafetyFlags(skin),
+    barrierRepairRegimen: buildBarrierRepairRegimen(skin),
   };
 }
 
@@ -546,12 +510,10 @@ export function transformSkinData(rawData: Record<string, unknown>): SkinAnalysi
             ? `Mild, localized redness (${rednessLevel}%). Often triggered by weather or product sensitivity.`
             : `Elevated redness (${rednessLevel}%). Look for fragrance-free, barrier-supporting products.`;
 
-    // Safety advice + local regimen are static app content (recommendations,
-    // not measurements) shared with the mock path, so they are identical no
-    // matter which API produced the scores.
-    const baseline = getMockSkinAnalysis();
-
-    return {
+    // Safety advice + regimen are Nyirira's curated content, derived from
+    // these very scores (lib/recommendations.ts) so the guidance adapts to
+    // what the scan found instead of repeating static text.
+    const skin: SkinSnapshot = {
       healthScore,
       spots: { count: 0, severity, description: spotsDescription },
       texture: {
@@ -560,8 +522,12 @@ export function transformSkinData(rawData: Record<string, unknown>): SkinAnalysi
         description: textureDescription,
       },
       redness: { level: rednessLevel, description: rednessDescription },
-      safetyFlags: baseline.safetyFlags,
-      barrierRepairRegimen: baseline.barrierRepairRegimen,
+    };
+
+    return {
+      ...skin,
+      safetyFlags: buildSafetyFlags(skin),
+      barrierRepairRegimen: buildBarrierRepairRegimen(skin),
     };
   }
 

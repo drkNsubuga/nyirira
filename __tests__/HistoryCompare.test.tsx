@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import HistoryCompare from '@/components/HistoryCompare';
 import { AnalysisResponse } from '@/lib/types';
 import { AnalysisHistoryItem } from '@/lib/storage';

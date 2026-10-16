@@ -1,7 +1,5 @@
 import {
   MAX_FILE_SIZE_BYTES,
-  MIN_SHORT_SIDE_PX,
-  MAX_LONG_SIDE_PX,
   dataUriByteLength,
   validateImageFile,
   validateImageSize,

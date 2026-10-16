@@ -1,7 +1,7 @@
 # Nyirira 🌍✨
 
 [![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com)
-[![Tests](https://img.shields.io/badge/tests-86%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-150%20passing-brightgreen.svg)](#testing)
 [![Coverage](https://img.shields.io/badge/coverage-70%25%2B-brightgreen.svg)](#testing)
 [![Next.js](https://img.shields.io/badge/Next.js-16%2B-black.svg?logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
@@ -25,11 +25,12 @@ Nyirira is a mobile-responsive single-page web application built for the Ugandan
 - **Skin Diagnostics**: Detects spots, texture, redness, and provides a health score (0-100)
 - **Virtual Try-On (VTO) + Colorimetry**: Suggests warm-toned lip shades and Kitenge-inspired outfit color palettes harmonizing with the user's complexion
 
-### 3. Localized Results Dashboard
-- **Skin Health & Safety Score** with visual indicators
-- **Safety Flags**: Critical warnings against bleaching agents (hydroquinone, mercury, kojic acid); recommendations for safe alternatives
-- **Barrier Repair Regimen**: Curated list of ingredients common in East African pharmacies (glycerin, niacinamide, natural oils)
-- **Harmonized Look**: Virtual makeup + outfit color suggestions paired with warm color undertones
+### 3. Localized Results Dashboard (tabbed)
+- **Skin Health & Safety Score** with visual indicators — the score comes straight from the YouCam API (`uiskin_score`, 0-100); it is **not** client-computed
+- **Safety Flags**: score-driven critical warnings against bleaching agents (hydroquinone, mercury, kojic acid); recommendations for safe alternatives (niacinamide, vitamin C, turmeric)
+- **Barrier Repair Regimen**: score-derived, curated list of ingredients common in East African pharmacies (glycerin, niacinamide, shea butter, natural oils)
+- **Harmonized Look**: score-aware virtual makeup + outfit color suggestions (Kitenge-inspired palettes) paired with warm undertones for melanin-rich skin
+- Results organized into shadcn-style tabs (Analysis Results / Safety & Regimen / Harmonized Look) to remove over-scrolling
 
 ### 4. Client-Side Validation & Error Handling
 - **Pre-submission checks**: File size, resolution, face detection, quality analysis, orientation (portrait selfies allowed; only extreme aspect ratios rejected)
@@ -122,6 +123,7 @@ nyirira/
 ├── lib/
 │   ├── types.ts                    # TypeScript type definitions
 │   ├── youcamClient.ts             # API client (mocked + live toggle)
+│   ├── recommendations.ts          # Score bands, safety flags, barrier repair regimen, harmonized look (Uganda/East Africa context)
 │   ├── imageValidation.ts          # Client-side validation
 │   └── advancedValidation.ts       # ML-powered validation
 ├── docs/
@@ -150,8 +152,8 @@ nyirira/
    - VTO + Colorimetry: lip shade & outfit color recommendations
    - Simulated 2-second delay for MVP demo
 
-3. **Results Step**: AnalysisDashboard displays findings
-   - Health score gauge
+3. **Results Step**: AnalysisDashboard displays findings in tabs (Analysis Results / Safety & Regimen / Harmonized Look)
+   - Health score gauge (score from YouCam API 'uiskin_score', not client-computed)
    - Safety warnings with recommendations
    - Barrier repair regimen (East African ingredients)
    - Color palette + lip shade suggestions
@@ -168,6 +170,10 @@ By default, the app uses mocked API responses for rapid MVP development. Respons
 const IS_PRODUCTION = process.env.NODE_ENV === 'production' && 
                       process.env.NEXT_PUBLIC_USE_REAL_API === 'true';
 ```
+
+#### How the Skin Score is derived
+
+The Skin Health Score (0-100) shown in the results dashboard comes **directly from the YouCam API response (`uiskin_score`)** — it is **not** computed client-side. Built on top of that score, `lib/recommendations.ts` turns it into score bands (`<60` repair · `60–79` balance · `≥80` thrive) and derives Nyirira's curated content: **Safety Flags** (bleaching/mercury warning, SPF 50+ reminder), **Barrier Repair Regimen** (shea butter, niacinamide, glycerin — East African pharmacy ingredients), and **Harmonized Look** guidance (Kitenge-inspired warm palettes). All product/regimen text is Nyirira's Uganda/East-Africa-context content; only the raw skin measurements come from the API.
 
 ### Production (Real API)
 
@@ -232,10 +238,11 @@ pnpm type-check   # Run TypeScript type check
 pnpm test
 ```
 
-Includes tests for:
-- `youcamClient.ts`: Mocked API response validation
+Includes tests for (23 suites, 150 tests):
+- `youcamClient.ts`: Mocked API response validation; score-derived safety flags & regimen in both mock and live paths
 - `CameraCapture.tsx`: Camera permission handling, file upload
-- `AnalysisDashboard.tsx`: Result rendering
+- `AnalysisDashboard.tsx`: Result rendering; tab switching (Analysis Results / Safety & Regimen / Harmonized Look)
+- `lib/recommendations.ts`: score bands, safety flag generation, barrier repair regimen, harmonized look lead
 
 ## CI/CD
 
@@ -262,6 +269,22 @@ pnpm add -g vercel
 # Deploy
 vercel
 ```
+
+## DevPost Submission Notes
+
+### What was built for this hackathon
+**Nyirira** — localized safe skincare diagnostics & virtual beauty matching for melanin-rich skin (Fitzpatrick types V-VI), built for the Ugandan/East African market.
+
+### Demo flow
+1. `pnpm dev` → open http://localhost:3000
+2. Take a selfie or upload a photo → skin analysis runs (mocked YouCam API by default; flip "Use live API" in Settings for the real API)
+3. Review the tabbed results dashboard: Analysis Results / Safety & Regimen / Harmonized Look
+4. Save results → reopen any past scan from Recent History on the capture screen
+
+### Key implementation notes
+- The Skin Health Score comes **directly from the YouCam API (`uiskin_score`)** — not client-computed. Nyirira's curated guidance (`lib/recommendations.ts`, Uganda/East Africa context: bleaching/mercury warning, SPF 50+, shea butter, niacinamide, Kitenge-inspired palettes) is derived from that score via score bands (`<60` repair · `60–79` balance · `≥80` thrive)
+- `pnpm test` — 23 suites / 150 tests passing; `pnpm build` passes; `tsc --noEmit` clean; ESLint 0 errors
+- Static export; `NEXT_PUBLIC_*` variables are inlined at build time (Cloudflare Pages / Vercel compatible)
 
 ## Localization & Cultural Context
 

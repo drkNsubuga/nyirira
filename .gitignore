@@ -13,10 +13,6 @@
 # testing
 /coverage
 /test-results
-*.test.ts
-*.test.tsx
-*.spec.ts
-*.spec.tsx
 
 # next.js
 /.next/
@@ -46,10 +42,6 @@ yarn-error.log*
 next-env.d.ts
 logs
 .okf
-
-# test directories
-tests/
-__tests__/
 
 # images
 img/
