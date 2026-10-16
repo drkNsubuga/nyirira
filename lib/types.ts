@@ -43,6 +43,11 @@ export interface VTOResult {
   recommendedLipShades: LipShade[];
   outfitPalette: ColorPalette;
   description: string;
+  /**
+   * Live look-vto success payload only contains the rendered try-on image URL
+   * (expires ~2h after the task). Present only on the live-API path.
+   */
+  tryOnImageUrl?: string;
 }
 
 export interface LipShade {

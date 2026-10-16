@@ -465,13 +465,107 @@ export async function analyzeImageWithFallback(imageData: string): Promise<Analy
 }
 
 /**
- * Transform raw YouCam skin analysis response to our format.
+ * Map the live YouCam v2 skin-analysis payload to our dashboard format.
  *
- * NOTE: This runs only on the live-API path. When the real API omits a field we
- * use NEUTRAL defaults (empty / zero) — never fabricated mock scores. Mock data
- * must only ever be returned when USE_REAL_API is disabled.
+ * The real task success payload is `results.output[]` — a list of
+ * `{ type, ui_score, raw_score }` entries (redness, radiance, texture,
+ * age_spot, plus skin_age/all/resize_image). `ui_score` is Perfect Corp's
+ * consumer-facing 0–100 score where HIGHER = better condition (their docs:
+ * ui_score is calibrated to "lean positive" and is the recommended choice for
+ * consumer experiences).
+ *
+ * NOTE: Runs only on the live-API path. When a type is missing the field falls
+ * back to a neutral value, and `hasCompleteAnalysis()` rejects an all-zero
+ * response with a friendly error instead of rendering an empty dashboard.
+ * Mock scores are only returned when USE_REAL_API is disabled.
  */
-function transformSkinData(rawData: Record<string, unknown>): SkinAnalysisResult {
+export function transformSkinData(rawData: Record<string, unknown>): SkinAnalysisResult {
+  const output = Array.isArray(rawData?.output)
+    ? (rawData.output as Array<Record<string, unknown> | null>).filter(
+        (entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object',
+      )
+    : [];
+
+  if (output.length > 0) {
+    const uiScore = (type: string): number | null => {
+      const entry = output.find((e) => e.type === type);
+      const value = Number(entry?.ui_score);
+      if (!Number.isFinite(value)) return null;
+      return Math.max(0, Math.min(100, value));
+    };
+
+    const rednessQuality = uiScore('redness'); // higher = calmer skin
+    const textureQuality = uiScore('texture'); // higher = smoother skin
+    const radianceQuality = uiScore('radiance'); // higher = more radiant
+    const pigmentationQuality = uiScore('age_spot'); // higher = fewer visible spots
+
+    const scores = [rednessQuality, textureQuality, radianceQuality, pigmentationQuality].filter(
+      (value): value is number => value !== null,
+    );
+    const healthScore =
+      scores.length > 0
+        ? Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length)
+        : 0;
+
+    const severity: 'mild' | 'moderate' | 'severe' =
+      pigmentationQuality === null
+        ? 'mild'
+        : pigmentationQuality >= 80
+          ? 'mild'
+          : pigmentationQuality >= 60
+            ? 'moderate'
+            : 'severe';
+
+    // The live API reports pigmentation as a quality score, not a spot count —
+    // `count` stays 0 and the card renders "—" instead of a fabricated number.
+    const spotsDescription =
+      pigmentationQuality === null
+        ? ''
+        : severity === 'mild'
+          ? `Minimal visible pigmentation — age-spot score ${pigmentationQuality}/100. Common post-inflammatory marks in melanin-rich skin are typically benign.`
+          : severity === 'moderate'
+            ? `Noticeable hyperpigmentation in several areas — age-spot score ${pigmentationQuality}/100. Consistent with post-inflammatory hyperpigmentation, common in melanin-rich skin.`
+            : `Widespread visible pigmentation — age-spot score ${pigmentationQuality}/100. Daily SPF plus a gentle brightening routine (niacinamide, vitamin C) is recommended.`;
+
+    const textureDescription =
+      textureQuality === null
+        ? ''
+        : textureQuality >= 80
+          ? `Smooth, even texture — score ${textureQuality}/100 with minimal visible pores.`
+          : textureQuality >= 60
+            ? `Generally even texture — score ${textureQuality}/100 with some unevenness in the T-zone.`
+            : `Rough or uneven texture — score ${textureQuality}/100. Gentle exfoliation 1–2× weekly can help.`;
+
+    const rednessLevel = rednessQuality === null ? 0 : Math.round(100 - rednessQuality);
+    const rednessDescription =
+      rednessQuality === null
+        ? ''
+        : rednessLevel <= 20
+          ? `Calm skin with little visible redness (score ${rednessQuality}/100).`
+          : rednessLevel <= 50
+            ? `Mild, localized redness (${rednessLevel}%). Often triggered by weather or product sensitivity.`
+            : `Elevated redness (${rednessLevel}%). Look for fragrance-free, barrier-supporting products.`;
+
+    // Safety advice + local regimen are static app content (recommendations,
+    // not measurements) shared with the mock path, so they are identical no
+    // matter which API produced the scores.
+    const baseline = getMockSkinAnalysis();
+
+    return {
+      healthScore,
+      spots: { count: 0, severity, description: spotsDescription },
+      texture: {
+        smoothness: textureQuality ?? 0,
+        roughness: textureQuality === null ? 0 : Math.round(100 - textureQuality),
+        description: textureDescription,
+      },
+      redness: { level: rednessLevel, description: rednessDescription },
+      safetyFlags: baseline.safetyFlags,
+      barrierRepairRegimen: baseline.barrierRepairRegimen,
+    };
+  }
+
+  // Legacy/pre-shaped payloads that already use our own field names.
   const spots = rawData?.spots as Record<string, unknown> | undefined;
   const texture = rawData?.texture as Record<string, unknown> | undefined;
   const redness = rawData?.redness as Record<string, unknown> | undefined;
@@ -503,25 +597,43 @@ function transformSkinData(rawData: Record<string, unknown>): SkinAnalysisResult
 }
 
 /**
- * Transform raw YouCam VTO response to our format.
+ * Map the live look-vto payload to our format.
  *
- * NOTE: Runs only on the live-API path. Missing fields fall back to NEUTRAL
- * (empty palette / empty shade list), never fabricated mock recommendations.
+ * The real success payload only contains `{ url }` — the rendered virtual
+ * try-on image — no colors. The palette/lip shades are Nyirira's curated
+ * style guidance (app content shared with the mock path — recommendations,
+ * not measured data); the live image is exposed via `tryOnImageUrl`.
  */
-function transformVTOData(rawData: Record<string, unknown>): VTOResult {
-  const outfitPalette = (rawData?.outfitPalette as Record<string, unknown>) ?? {};
-  const recommendedLipShades = Array.isArray(rawData?.recommendedLipShades)
-    ? rawData!.recommendedLipShades
-    : [];
+export function transformVTOData(rawData: Record<string, unknown>): VTOResult {
+  const url = typeof rawData?.url === 'string' ? rawData.url : '';
+  const tryOnImageUrl = /^https?:\/\//.test(url) ? url : undefined;
 
+  // Pre-shaped payloads (already our field names) pass through unchanged —
+  // including intentionally empty palette/shades from callers.
+  if (Array.isArray(rawData?.recommendedLipShades) || rawData?.outfitPalette) {
+    const outfitPalette = (rawData?.outfitPalette as Record<string, unknown>) ?? {};
+    return {
+      recommendedLipShades: (Array.isArray(rawData?.recommendedLipShades)
+        ? rawData.recommendedLipShades
+        : []) as VTOResult['recommendedLipShades'],
+      outfitPalette: {
+        primary: String(outfitPalette.primary ?? ''),
+        secondary: String(outfitPalette.secondary ?? ''),
+        accent: String(outfitPalette.accent ?? ''),
+        inspiration: String(outfitPalette.inspiration ?? ''),
+      },
+      description: String(rawData?.description ?? ''),
+      ...(tryOnImageUrl ? { tryOnImageUrl } : {}),
+    };
+  }
+
+  // Live look-vto payload is just { url } → curated style + the live image.
+  const curated = getMockVTOResult();
   return {
-    recommendedLipShades: recommendedLipShades as VTOResult['recommendedLipShades'],
-    outfitPalette: {
-      primary: String(outfitPalette.primary ?? ''),
-      secondary: String(outfitPalette.secondary ?? ''),
-      accent: String(outfitPalette.accent ?? ''),
-      inspiration: String(outfitPalette.inspiration ?? ''),
-    },
-    description: String(rawData?.description ?? ''),
+    ...curated,
+    ...(tryOnImageUrl ? { tryOnImageUrl } : {}),
+    description: tryOnImageUrl
+      ? `${curated.description} Your live virtual try-on look is shown above.`
+      : curated.description,
   };
 }

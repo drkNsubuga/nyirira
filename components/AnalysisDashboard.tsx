@@ -75,7 +75,11 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
               <Shield className="w-4 h-4 text-slate-600" />
               Spots
             </h4>
-            <p className="text-2xl font-bold text-slate-900">{skinAnalysis.spots.count}</p>
+            <p className="text-2xl font-bold text-slate-900">
+              {/* The live API reports pigmentation as a score, not a spot count —
+                  show "—" rather than a misleading zero. */}
+              {skinAnalysis.spots.count > 0 ? skinAnalysis.spots.count : '—'}
+            </p>
             <p className="text-sm text-slate-600 capitalize">{skinAnalysis.spots.severity}</p>
             <p className="text-xs text-slate-500 mt-2">{skinAnalysis.spots.description}</p>
           </div>
@@ -186,9 +190,26 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
 
         <p className="text-amber-900 mb-6">{vto.description}</p>
 
+        {/* Live look-vto result — the actual rendered virtual try-on image. */}
+        {vto.tryOnImageUrl && (
+          <div className="mb-6">
+            <p className="text-sm font-semibold text-amber-900 mb-3">Live Virtual Try-On</p>
+            <img
+              src={vto.tryOnImageUrl}
+              alt="Your virtual try-on result"
+              className="w-full max-w-sm rounded-xl border-2 border-amber-300 shadow-md"
+              onError={(e) => {
+                // The presigned result URL expires ~2h after the task completes.
+                (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
+              }}
+            />
+          </div>
+        )}
+
         {/* Color Palette */}
         <div className="mb-6">
           <p className="text-sm font-semibold text-amber-900 mb-3">Color Palette</p>
+          {vto.outfitPalette.primary ? (
           <div className="grid grid-cols-4 gap-3 mb-4">
             <div className="text-center">
               <div
@@ -221,11 +242,15 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
               <p className="text-xs font-medium text-slate-700">{vto.outfitPalette.inspiration}</p>
             </div>
           </div>
+          ) : (
+            <p className="text-sm text-amber-800">No color palette was saved with this result.</p>
+          )}
         </div>
 
         {/* Recommended Lip Shades */}
         <div>
           <p className="text-sm font-semibold text-amber-900 mb-3">Recommended Lip Shades</p>
+          {vto.recommendedLipShades.length > 0 ? (
           <div className="space-y-2">
             {vto.recommendedLipShades.map((shade, idx) => (
               <div key={idx} className="flex items-center gap-4 p-3 bg-white rounded-lg border border-amber-200">
@@ -243,6 +268,9 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
               </div>
             ))}
           </div>
+          ) : (
+            <p className="text-sm text-amber-800">No shade recommendations were saved with this result.</p>
+          )}
         </div>
       </div>
 

@@ -106,7 +106,7 @@ export default function ImageOverlay({ analysis, imageData, className = '' }: Im
         </div>
       </div>
       <div className='mt-3 flex flex-wrap gap-4 text-sm'>
-        <div className='flex items-center gap-2'><div className='w-4 h-4 rounded-full' style={{ backgroundColor: getMarkerColor('spot') }} /><span>Hyperpigmented Spots ({analysis.skinAnalysis.spots.count})</span></div>
+        <div className='flex items-center gap-2'><div className='w-4 h-4 rounded-full' style={{ backgroundColor: getMarkerColor('spot') }} /><span>Hyperpigmented Spots ({analysis.skinAnalysis.spots.count > 0 ? analysis.skinAnalysis.spots.count : analysis.skinAnalysis.spots.severity})</span></div>
         <div className='flex items-center gap-2'><div className='w-4 h-4 rounded-full' style={{ backgroundColor: getMarkerColor('redness') }} /><span>Redness Level ({analysis.skinAnalysis.redness.level})</span></div>
         <div className='flex items-center gap-2'><div className='w-4 h-4 rounded-full' style={{ backgroundColor: getMarkerColor('texture') }} /><span>Texture Issues ({analysis.skinAnalysis.texture.smoothness})</span></div>
       </div>

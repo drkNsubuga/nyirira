@@ -15,6 +15,8 @@ const customJestConfig = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
   },
+  // Playwright e2e specs live in ./tests and must only run via `npm run test:e2e`.
+  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/tests/'],
   collectCoverageFrom: [
     'app/**/*.{js,jsx,ts,tsx}',
     'components/**/*.{js,jsx,ts,tsx}',

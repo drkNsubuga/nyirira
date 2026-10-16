@@ -337,6 +337,10 @@ export default function Home() {
     const hasEssentialSkinData = skin && 
       typeof skin.healthScore === 'number' && 
       Number.isFinite(skin.healthScore) &&
+      // A live response that mapped to 0 means every score was missing/unreadable
+      // (e.g. another API shape drift) — treat it as "no usable results" instead
+      // of rendering a dashboard full of zeros.
+      skin.healthScore > 0 &&
       skin.spots && 
       skin.texture && 
       skin.redness &&
