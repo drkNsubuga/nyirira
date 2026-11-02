@@ -42,7 +42,7 @@ Nyirira is a mobile-responsive single-page web application built for the Ugandan
   - 🟢 **VERIFIED SAFE** — curated authentic products
   - Filter by product/brand search, Uganda trading market, and risk level
   - UNBS emergency contact in footer (+256 41 4505995)
-### 5. Client-Side Validation & Error Handling & Error Handling
+### 5. Client-Side Validation & Error Handling
 - **Pre-submission checks**: File size, resolution, face detection, quality analysis, orientation (portrait selfies allowed; only extreme aspect ratios rejected)
 - **ML-powered validation**: TensorFlow.js face detection, Tesseract.js privacy checks
 - **Offline error processing**: Comprehensive error code mapping with fallback messages
@@ -283,13 +283,14 @@ vercel
 ## DevPost Submission Notes
 
 ### What was built for this hackathon
-**Nyirira** — localized safe skincare diagnostics & virtual beauty matching for melanin-rich skin (Fitzpatrick types V-VI), built for the Ugandan/East African market.
+**Nyirira** ([devpost.com/software/nyirira-skin-ai-for-melanin-rich-skin](https://devpost.com/software/nyirira-skin-ai-for-melanin-rich-skin)) — localized safe skincare diagnostics & virtual beauty matching for melanin-rich skin (Fitzpatrick types V-VI), built for the Ugandan/East African market.
 
 ### Demo flow
 1. `pnpm dev` → open http://localhost:3000
 2. Take a selfie or upload a photo → skin analysis runs (mocked YouCam API by default; flip "Use live API" in Settings for the real API)
-3. Review the tabbed results dashboard: Analysis Results / Safety & Regimen / Harmonized Look
-4. Save results → reopen any past scan from Recent History on the capture screen
+3. Review the 4-tab results dashboard: Analysis Results / Safety & Regimen / Harmonized Look / Community Watch
+4. Community Watch tab shows flagged products and lets you file an adverse-reaction report at any time
+5. Save results → reopen any past scan from Recent History on the capture screen
 
 ### Key implementation notes
 - The Skin Health Score comes **directly from the YouCam API (`uiskin_score`)** — not client-computed. Nyirira's curated guidance (`lib/recommendations.ts`, Uganda/East Africa context: bleaching/mercury warning, SPF 50+, shea butter, niacinamide, Kitenge-inspired palettes) is derived from that score via score bands (`<60` repair · `60–79` balance · `≥80` thrive)
