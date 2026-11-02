@@ -1,12 +1,28 @@
 'use client';
 
-import ImageOverlay from './ImageOverlay';
 import CommunitySafetyWatch from './CommunitySafetyWatch';
 import ReportCounterfeitModal from './ReportCounterfeitModal';
 import { AnalysisResponse } from '@/lib/types';
-import React, { useState } from 'react';
+import { applyMakeupVTO, getLastFileId, shouldUseRealApi } from '@/lib/youcamClient';
+import React, { useCallback, useRef, useState } from 'react';
 import Image from 'next/image';
-import { AlertTriangle, CheckCircle, Leaf, Palette, Shield, ArrowLeft, Users, ShieldAlert } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle,
+  Leaf,
+  Palette,
+  Shield,
+  ArrowLeft,
+  Users,
+  ShieldAlert,
+  Microscope,
+  Loader2,
+  WandSparkles,
+  Pencil,
+  Check,
+  X,
+  Layers,
+} from 'lucide-react';
 import { ANALYSIS_KEY } from '@/lib/storage';
 import { harmonizedLookLead } from '@/lib/recommendations';
 
@@ -20,10 +36,22 @@ interface AnalysisDashboardProps {
 // ---------- Lightweight Tabs ----------
 type TabItem = React.ReactElement<{ value: string; children?: React.ReactNode }>;
 
-function Tabs({ children, defaultValue, className }: { children: React.ReactNode; defaultValue: string; className?: string }) {
+function Tabs({
+  children,
+  defaultValue,
+  className,
+}: {
+  children: React.ReactNode;
+  defaultValue: string;
+  className?: string;
+}) {
   const [value, setValue] = React.useState(defaultValue);
-  const triggers = React.Children.toArray(children).filter((c): c is TabItem => React.isValidElement(c) && c.type === TabTrigger);
-  const contents = React.Children.toArray(children).filter((c): c is TabItem => React.isValidElement(c) && c.type === TabContent);
+  const triggers = React.Children.toArray(children).filter(
+    (c): c is TabItem => React.isValidElement(c) && c.type === TabTrigger
+  );
+  const contents = React.Children.toArray(children).filter(
+    (c): c is TabItem => React.isValidElement(c) && c.type === TabContent
+  );
 
   return (
     <div className={className}>
@@ -63,10 +91,13 @@ function Tabs({ children, defaultValue, className }: { children: React.ReactNode
   );
 }
 
-function TabTrigger({ }: { children: React.ReactNode; value: string }) { return null; }
-function TabContent({ }: { children: React.ReactNode; value: string }) { return null; }
+function TabTrigger(_: { children: React.ReactNode; value: string }) {
+  return null;
+}
+function TabContent(_: { children: React.ReactNode; value: string }) {
+  return null;
+}
 
-/** Returns true when the analysis flags redness, inflammation, or dark spots severity that warrants the counterfeit prompt. */
 function shouldPromptCounterfeit(analysis: AnalysisResponse): boolean {
   const { skinAnalysis } = analysis;
   return (
@@ -77,36 +108,196 @@ function shouldPromptCounterfeit(analysis: AnalysisResponse): boolean {
   );
 }
 
-export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved }: AnalysisDashboardProps) {
-  const { skinAnalysis, vto } = analysis;
-  const [reportOpen, setReportOpen] = useState(false);
+const CONCERN_LABELS: Record<string, string> = {
+  redness: 'Redness',
+  age_spot: 'Age Spots',
+  texture: 'Texture',
+  radiance: 'Radiance',
+  acne: 'Acne',
+  pore: 'Pores',
+  wrinkle: 'Wrinkles',
+  moisture: 'Moisture',
+  oiliness: 'Oiliness',
+  firmness: 'Firmness',
+};
 
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-emerald-600';
-    if (score >= 60) return 'text-amber-600';
-    return 'text-orange-600';
-  };
+const CONCERN_COLORS: Record<string, string> = {
+  redness: '#ef4444',
+  age_spot: '#f59e0b',
+  texture: '#8b5cf6',
+  radiance: '#f97316',
+  acne: '#ec4899',
+  pore: '#06b6d4',
+  wrinkle: '#64748b',
+  moisture: '#3b82f6',
+  oiliness: '#84cc16',
+  firmness: '#14b8a6',
+};
 
-  const getScoreBg = (score: number) => {
-    if (score >= 80) return 'bg-emerald-100';
-    if (score >= 60) return 'bg-amber-100';
-    return 'bg-orange-100';
+function EditableSwatch({
+  label,
+  color,
+  onChange,
+}: {
+  label: string;
+  color: string;
+  onChange: (hex: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(color);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const commit = () => {
+    const hex = draft.startsWith('#') ? draft : `#${draft}`;
+    const valid = /^#[0-9a-fA-F]{6}$/.test(hex);
+    if (valid) onChange(hex);
+    else setDraft(color);
+    setEditing(false);
   };
 
   return (
+    <div className="text-center">
+      <div className="relative mx-auto mb-2 w-16 h-16 group">
+        <div
+          className="w-16 h-16 rounded-lg shadow-md border-2 border-amber-300 cursor-pointer"
+          style={{ backgroundColor: color }}
+          onClick={() => {
+            setDraft(color);
+            setEditing(true);
+            setTimeout(() => inputRef.current?.focus(), 50);
+          }}
+          title="Click to edit colour"
+        />
+        {!editing && (
+          <button
+            type="button"
+            aria-label={`Edit ${label} colour`}
+            onClick={() => {
+              setDraft(color);
+              setEditing(true);
+              setTimeout(() => inputRef.current?.focus(), 50);
+            }}
+            className="absolute -top-1 -right-1 hidden group-hover:flex w-5 h-5 rounded-full bg-white border border-amber-300 items-center justify-center shadow"
+          >
+            <Pencil className="w-2.5 h-2.5 text-amber-700" />
+          </button>
+        )}
+      </div>
+
+      {editing ? (
+        <div className="flex flex-col items-center gap-1 mt-1">
+          <div className="flex items-center gap-1">
+            <input
+              type="color"
+              value={draft.startsWith('#') && /^#[0-9a-fA-F]{6}$/.test(draft) ? draft : color}
+              onChange={(e) => setDraft(e.target.value)}
+              className="w-8 h-8 rounded cursor-pointer border border-slate-300"
+              title="Pick a colour"
+            />
+            <input
+              ref={inputRef}
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commit();
+                if (e.key === 'Escape') {
+                  setEditing(false);
+                  setDraft(color);
+                }
+              }}
+              className="w-20 text-xs rounded border border-slate-300 px-1 py-0.5 font-mono text-center"
+              placeholder="#RRGGBB"
+              maxLength={7}
+            />
+            <button type="button" onClick={commit} className="p-0.5 text-emerald-600 hover:text-emerald-800">
+              <Check className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(false);
+                setDraft(color);
+              }}
+              className="p-0.5 text-red-500 hover:text-red-700"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <p className="text-xs font-medium text-slate-700">{label}</p>
+          <p className="text-xs text-slate-500">{color}</p>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved }: AnalysisDashboardProps) {
+  const { skinAnalysis, vto } = analysis;
+  const [reportOpen, setReportOpen] = useState(false);
+  const [palette, setPalette] = useState(vto.outfitPalette);
+  const [activeShadeIdx, setActiveShadeIdx] = useState<number | null>(null);
+  const [shadeVtoLoading, setShadeVtoLoading] = useState(false);
+  const [shadeVtoUrls, setShadeVtoUrls] = useState<Record<string, string>>({});
+  const [activeMaskIdx, setActiveMaskIdx] = useState<number | null>(null);
+
+  const handleShadeSelect = useCallback(
+    async (idx: number) => {
+      const shade = vto.recommendedLipShades[idx];
+      if (!shade) return;
+      setActiveShadeIdx(idx);
+      if (shadeVtoUrls[shade.hexColor]) return;
+      if (!shouldUseRealApi()) return;
+      const fileId = getLastFileId();
+      if (!fileId) return;
+      setShadeVtoLoading(true);
+      try {
+        const url = await applyMakeupVTO(fileId, shade.hexColor);
+        if (url) setShadeVtoUrls((prev) => ({ ...prev, [shade.hexColor]: url }));
+      } finally {
+        setShadeVtoLoading(false);
+      }
+    },
+    [vto.recommendedLipShades, shadeVtoUrls]
+  );
+
+  const getScoreColor = (score: number) =>
+    score >= 80 ? 'text-emerald-600' : score >= 60 ? 'text-amber-600' : 'text-orange-600';
+  const getScoreBg = (score: number) =>
+    score >= 80 ? 'bg-emerald-100' : score >= 60 ? 'bg-amber-100' : 'bg-orange-100';
+
+  const concernMasks = skinAnalysis.concernMasks ?? [];
+  const activeMask = activeMaskIdx !== null ? concernMasks[activeMaskIdx] : null;
+
+  return (
     <div className="w-full max-w-2xl mx-auto px-4 py-6 pb-12">
-      <button
-        onClick={onBack}
-        className="flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-6 font-medium"
-      >
+      <button onClick={onBack} className="flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-6 font-medium">
         <ArrowLeft className="w-4 h-4" />
         Back
       </button>
 
       <Tabs defaultValue="results" className="mb-2">
-        <TabTrigger value="results">Analysis Results</TabTrigger>
-        <TabTrigger value="safety">Safety &amp; Regimen</TabTrigger>
-        <TabTrigger value="look">Harmonized Look</TabTrigger>
+        <TabTrigger value="results">
+          <span className="flex items-center gap-1.5">
+            <Microscope className="w-3.5 h-3.5" />
+            Analysis Results
+          </span>
+        </TabTrigger>
+        <TabTrigger value="safety">
+          <span className="flex items-center gap-1.5">
+            <Shield className="w-3.5 h-3.5" />
+            Safety &amp; Regimen
+          </span>
+        </TabTrigger>
+        <TabTrigger value="look">
+          <span className="flex items-center gap-1.5">
+            <Palette className="w-3.5 h-3.5" />
+            Harmonized Look
+          </span>
+        </TabTrigger>
         <TabTrigger value="community">
           <span className="flex items-center gap-1.5">
             <Users className="w-3.5 h-3.5" />
@@ -116,67 +307,154 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
 
         {/* ===== Tab 1: Analysis Results ===== */}
         <TabContent value="results">
-          <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-8 mb-8 shadow-lg dark:from-slate-800 dark:to-slate-900">
-            <h2 className="text-2xl font-bold text-slate-900 mb-6">Skin Health & Safety Score</h2>
+          <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-6 mb-6 shadow-lg dark:from-slate-800 dark:to-slate-900">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">
+              Skin Health &amp; Safety Score
+            </h2>
 
+            {/* Skin image with optional YouCam mask overlay */}
             <div className="mb-6">
-              <ImageOverlay analysis={analysis} imageData={imageData} className="w-full" />
+              <div className="relative rounded-xl overflow-hidden">
+                <Image
+                  src={imageData}
+                  alt="Scanned skin photo"
+                  width={600}
+                  height={750}
+                  className="w-full rounded-xl object-cover"
+                  sizes="(max-width: 640px) 100vw, 600px"
+                  unoptimized
+                />
+                {activeMask && activeMask.maskUrls[0] && (
+                  <Image
+                    src={activeMask.maskUrls[0]}
+                    alt={`${CONCERN_LABELS[activeMask.type] ?? activeMask.type} mask overlay`}
+                    fill
+                    className="object-cover mix-blend-multiply opacity-70 rounded-xl"
+                    unoptimized
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                )}
+                {activeMask && (
+                  <div className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+                    <Layers className="w-3 h-3" />
+                    {CONCERN_LABELS[activeMask.type] ?? activeMask.type} overlay
+                    <button
+                      type="button"
+                      aria-label="Clear overlay"
+                      onClick={() => setActiveMaskIdx(null)}
+                      className="ml-1 text-white/70 hover:text-white"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Concern mask selector (live API only) */}
+              {concernMasks.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs text-slate-500 mb-2 flex items-center gap-1">
+                    <Layers className="w-3 h-3" />
+                    Show affected areas:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {concernMasks.map((mask, i) => {
+                      const label = CONCERN_LABELS[mask.type] ?? mask.type;
+                      const color = CONCERN_COLORS[mask.type] ?? '#64748b';
+                      const active = activeMaskIdx === i;
+                      return (
+                        <button
+                          key={mask.type}
+                          type="button"
+                          onClick={() => setActiveMaskIdx(active ? null : i)}
+                          aria-pressed={active}
+                          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-all ${
+                            active
+                              ? 'text-white border-transparent'
+                              : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400'
+                          }`}
+                          style={active ? { backgroundColor: color, borderColor: color } : {}}
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: active ? 'rgba(255,255,255,0.7)' : color }}
+                          />
+                          {label}
+                          <span className="opacity-70">{mask.ui_score}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex-1">
-                <div className={`w-32 h-32 rounded-full flex items-center justify-center ${getScoreBg(skinAnalysis.healthScore)} mx-auto mb-4`}>
-                  <div className="text-center">
-                    <div className={`text-5xl font-bold ${getScoreColor(skinAnalysis.healthScore)}`}>
-                      {skinAnalysis.healthScore}
-                    </div>
-                    <div className="text-sm text-slate-600">Health Score</div>
+            {/* Health score gauge */}
+            <div className="flex justify-center mb-6">
+              <div
+                className={`w-32 h-32 rounded-full flex items-center justify-center ${getScoreBg(
+                  skinAnalysis.healthScore
+                )}`}
+              >
+                <div className="text-center">
+                  <div className={`text-5xl font-bold ${getScoreColor(skinAnalysis.healthScore)}`}>
+                    {skinAnalysis.healthScore}
                   </div>
+                  <div className="text-sm text-slate-600">Health Score</div>
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-lg p-4 border border-slate-200">
-                <h4 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
+              <div className="bg-white rounded-lg p-4 border border-slate-200 dark:bg-slate-800 dark:border-slate-700">
+                <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-2">
                   <Shield className="w-4 h-4 text-slate-600" />
                   Spots
                 </h4>
-                <p className="text-2xl font-bold text-slate-900">
+                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                   {skinAnalysis.spots.count > 0 ? skinAnalysis.spots.count : '—'}
                 </p>
-                <p className="text-sm text-slate-600 capitalize">{skinAnalysis.spots.severity}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400 capitalize">
+                  {skinAnalysis.spots.severity}
+                </p>
                 <p className="text-xs text-slate-500 mt-2">{skinAnalysis.spots.description}</p>
               </div>
 
-              <div className="bg-white rounded-lg p-4 border border-slate-200">
-                <h4 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
+              <div className="bg-white rounded-lg p-4 border border-slate-200 dark:bg-slate-800 dark:border-slate-700">
+                <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-emerald-600" />
                   Texture
                 </h4>
                 <div className="space-y-2 mb-2">
                   <div>
-                    <p className="text-xs text-slate-600">Smoothness</p>
-                    <p className="text-sm font-bold text-slate-900">{skinAnalysis.texture.smoothness}%</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">Smoothness</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                      {skinAnalysis.texture.smoothness}%
+                    </p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-600">Roughness</p>
-                    <p className="text-sm font-bold text-slate-900">{skinAnalysis.texture.roughness}%</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">Roughness</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                      {skinAnalysis.texture.roughness}%
+                    </p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg p-4 border border-slate-200">
-                <h4 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
+              <div className="bg-white rounded-lg p-4 border border-slate-200 dark:bg-slate-800 dark:border-slate-700">
+                <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-orange-600" />
                   Redness
                 </h4>
-                <p className="text-2xl font-bold text-slate-900">{skinAnalysis.redness.level}%</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                  {skinAnalysis.redness.level}%
+                </p>
                 <p className="text-xs text-slate-500 mt-2">{skinAnalysis.redness.description}</p>
               </div>
             </div>
 
-            {/* Counterfeit diagnostic prompt */}
             {shouldPromptCounterfeit(analysis) && (
               <div className="mt-6 rounded-xl border border-red-300 bg-red-50 dark:bg-red-950/40 dark:border-red-900 p-4">
                 <div className="flex items-start gap-3">
@@ -186,8 +464,8 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
                       Did this barrier damage start after using a recent product?
                     </p>
                     <p className="text-sm text-red-700 dark:text-red-300 mb-3">
-                      Your skin shows signs of chemical irritation. Reporting suspected counterfeit
-                      or harmful products helps protect others in your community.
+                      Your skin shows signs of chemical irritation. Reporting suspected counterfeit or harmful
+                      products helps protect others in your community.
                     </p>
                     <button
                       type="button"
@@ -207,7 +485,7 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
         <TabContent value="safety">
           {skinAnalysis.safetyFlags.length > 0 && (
             <div className="mb-6">
-              <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-orange-600" />
                 Safety Flags
               </h3>
@@ -216,9 +494,7 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
                   <div
                     key={flag.id}
                     className={`rounded-lg p-4 border-l-4 ${
-                      flag.severity === 'critical'
-                        ? 'bg-red-50 border-red-400'
-                        : 'bg-amber-50 border-amber-400'
+                      flag.severity === 'critical' ? 'bg-red-50 border-red-400' : 'bg-amber-50 border-amber-400'
                     }`}
                   >
                     <h4 className="font-semibold text-slate-900 mb-2">{flag.title}</h4>
@@ -234,9 +510,9 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
           )}
 
           <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-2xl p-8 mb-6 shadow-lg border-2 border-emerald-200 dark:from-emerald-950/60 dark:to-slate-900 dark:border-emerald-900">
-            <h3 className="text-xl font-bold text-emerald-900 mb-4 flex items-center gap-2">
+            <h3 className="text-xl font-bold text-emerald-900 dark:text-emerald-100 mb-4 flex items-center gap-2">
               <Leaf className="w-5 h-5" />
-              Barrier Repair Regimen (Local & Safe)
+              Barrier Repair Regimen (Local &amp; Safe)
             </h3>
             <div className="space-y-4">
               {skinAnalysis.barrierRepairRegimen.map((product) => (
@@ -251,7 +527,10 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
                     <p className="text-xs text-slate-600 font-semibold mb-1">Active Ingredients:</p>
                     <div className="flex flex-wrap gap-2">
                       {product.activeIngredients.map((ingredient, i) => (
-                        <span key={i} className="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded border border-emerald-200">
+                        <span
+                          key={i}
+                          className="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded border border-emerald-200"
+                        >
                           {ingredient}
                         </span>
                       ))}
@@ -266,77 +545,153 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
 
         {/* ===== Tab 3: Harmonized Look ===== */}
         <TabContent value="look">
-          <div className="mb-6">
-            <h3 className="text-xl font-bold text-slate-900 mb-3 flex items-center gap-2">
+          <div className="mb-5">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-3 flex items-center gap-2">
               <Palette className="w-5 h-5 text-amber-600" />
               Harmonized Look
             </h3>
-            <p className="text-slate-700 leading-relaxed">{harmonizedLookLead(skinAnalysis)}</p>
+            <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{harmonizedLookLead(skinAnalysis)}</p>
           </div>
 
-          {vto.tryOnImageUrl && (
-            <div className="mb-6">
-              <p className="text-sm font-semibold text-amber-900 mb-3">Live Virtual Try-On</p>
-              <Image
-                src={vto.tryOnImageUrl}
-                alt="Your virtual try-on result"
-                width={400}
-                height={500}
-                className="w-full max-w-sm rounded-xl border-2 border-amber-300 shadow-md"
-                sizes="(max-width: 640px) 100vw, 400px"
-                onError={(e) => {
-                  (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
-                }}
-              />
-            </div>
-          )}
-
-          <div className="mb-6">
-            <p className="text-sm font-semibold text-amber-900 mb-3">Color Palette</p>
-            {vto.outfitPalette.primary ? (
-              <div className="grid grid-cols-4 gap-3 mb-4">
-                {[
-                  { label: 'Primary', color: vto.outfitPalette.primary },
-                  { label: 'Secondary', color: vto.outfitPalette.secondary },
-                  { label: 'Accent', color: vto.outfitPalette.accent },
-                ].map(({ label, color }) => (
-                  <div key={label} className="text-center">
-                    <div className="w-16 h-16 rounded-lg shadow-md mx-auto mb-2 border-2 border-amber-300" style={{ backgroundColor: color }} />
-                    <p className="text-xs font-medium text-slate-700">{label}</p>
-                    <p className="text-xs text-slate-500">{color}</p>
+          {/* VTO result — per-shade takes priority over look-vto */}
+          {(() => {
+            const activeShade = activeShadeIdx !== null ? vto.recommendedLipShades[activeShadeIdx] : null;
+            const shadeUrl = activeShade ? shadeVtoUrls[activeShade.hexColor] : undefined;
+            const displayUrl = shadeUrl ?? vto.tryOnImageUrl;
+            return (
+              <div className="mb-6">
+                <p className="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-3 flex items-center gap-2">
+                  <WandSparkles className="w-4 h-4" />
+                  {shadeUrl ? `Virtual Try-On — ${activeShade?.name}` : 'Live Virtual Try-On'}
+                </p>
+                {shadeVtoLoading ? (
+                  <div className="flex items-center justify-center h-48 rounded-xl border-2 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+                    <div className="text-center">
+                      <Loader2 className="w-8 h-8 text-amber-600 animate-spin mx-auto mb-2" />
+                      <p className="text-sm text-amber-700 dark:text-amber-300">
+                        Applying {activeShade?.name ?? 'shade'} via YouCam…
+                      </p>
+                    </div>
                   </div>
-                ))}
-                <div className="text-center">
-                  <div className="w-16 h-16 rounded-lg shadow-md mx-auto mb-2 border-2 border-amber-300 flex items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300">
-                    <span className="text-xs font-bold">+</span>
-                  </div>
-                  <p className="text-xs font-medium text-slate-700">{vto.outfitPalette.inspiration}</p>
-                </div>
+                ) : displayUrl ? (
+                  <Image
+                    src={displayUrl}
+                    alt={shadeUrl ? `Virtual try-on with ${activeShade?.name}` : 'Your virtual try-on result'}
+                    width={400}
+                    height={500}
+                    className="w-full max-w-sm rounded-xl border-2 border-amber-300 shadow-md"
+                    sizes="(max-width: 640px) 100vw, 400px"
+                    unoptimized
+                    onError={(e) => {
+                      (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                ) : shouldUseRealApi() ? (
+                  <p className="text-sm text-amber-700 dark:text-amber-400 italic">
+                    Select a lip shade below to generate your virtual try-on.
+                  </p>
+                ) : (
+                  <p className="text-sm text-slate-500 dark:text-slate-400 italic">
+                    Enable live API in Settings to see virtual try-on results.
+                  </p>
+                )}
               </div>
-            ) : (
-              <p className="text-sm text-amber-800">No color palette was saved with this result.</p>
-            )}
-          </div>
+            );
+          })()}
 
-          <div>
-            <p className="text-sm font-semibold text-amber-900 mb-3">Recommended Lip Shades</p>
+          {/* Lip shade selector with per-shade VTO trigger */}
+          <div className="mb-7">
+            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-3">
+              Recommended Lip Shades
+              {shouldUseRealApi() && (
+                <span className="ml-2 text-xs font-normal text-amber-600 dark:text-amber-400">
+                  — tap a shade to try it on
+                </span>
+              )}
+            </p>
             {vto.recommendedLipShades.length > 0 ? (
               <div className="space-y-2">
-                {vto.recommendedLipShades.map((shade, idx) => (
-                  <div key={idx} className="flex items-center gap-4 p-3 bg-white rounded-lg border border-amber-200">
-                    <div className="w-8 h-8 rounded-lg border-2 border-white shadow-md" style={{ backgroundColor: shade.hexColor }} />
-                    <div className="flex-1">
-                      <p className="font-medium text-slate-900">{shade.name}</p>
-                      <p className="text-xs text-slate-600">{shade.description}</p>
-                    </div>
-                    <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded capitalize font-medium">
-                      {shade.undertone}
-                    </span>
-                  </div>
-                ))}
+                {vto.recommendedLipShades.map((shade, idx) => {
+                  const isActive = activeShadeIdx === idx;
+                  const hasResult = !!shadeVtoUrls[shade.hexColor];
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleShadeSelect(idx)}
+                      aria-pressed={isActive}
+                      className={`w-full flex items-center gap-4 p-3 rounded-lg border text-left transition-all ${
+                        isActive
+                          ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30 shadow-sm'
+                          : 'border-amber-200 bg-white dark:bg-slate-800 hover:border-amber-300 hover:bg-amber-50/50'
+                      }`}
+                    >
+                      <div
+                        className="w-10 h-10 rounded-lg border-2 border-white shadow-md flex-shrink-0"
+                        style={{ backgroundColor: shade.hexColor }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-slate-900 dark:text-slate-100">{shade.name}</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 truncate">{shade.description}</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-xs bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 px-2 py-1 rounded capitalize font-medium">
+                          {shade.undertone}
+                        </span>
+                        {shouldUseRealApi() &&
+                          (hasResult ? (
+                            <span className="text-xs text-emerald-600 font-medium flex items-center gap-0.5">
+                              <Check className="w-3 h-3" /> done
+                            </span>
+                          ) : isActive && shadeVtoLoading ? (
+                            <Loader2 className="w-4 h-4 text-amber-600 animate-spin" />
+                          ) : (
+                            <WandSparkles className="w-4 h-4 text-amber-400" />
+                          ))}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-amber-800">No shade recommendations were saved with this result.</p>
+            )}
+          </div>
+
+          {/* Editable colour palette (offline, client-only state) */}
+          <div className="mb-4">
+            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-1 flex items-center gap-1.5">
+              <Pencil className="w-3.5 h-3.5" />
+              Colour Palette
+              <span className="text-xs font-normal text-amber-600 dark:text-amber-400">
+                — click a swatch to edit
+              </span>
+            </p>
+            {palette.primary ? (
+              <div className="grid grid-cols-4 gap-3 mt-3">
+                {(
+                  [
+                    { key: 'primary', label: 'Primary' },
+                    { key: 'secondary', label: 'Secondary' },
+                    { key: 'accent', label: 'Accent' },
+                  ] as { key: 'primary' | 'secondary' | 'accent'; label: string }[]
+                ).map(({ key, label }) => (
+                  <EditableSwatch
+                    key={key}
+                    label={label}
+                    color={palette[key]}
+                    onChange={(hex) => setPalette((p) => ({ ...p, [key]: hex }))}
+                  />
+                ))}
+                <div className="text-center">
+                  <div className="w-16 h-16 rounded-lg shadow-md mx-auto mb-2 border-2 border-amber-300 flex items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800">
+                    <span className="text-xs font-bold text-slate-500">✦</span>
+                  </div>
+                  <p className="text-xs font-medium text-slate-700 dark:text-slate-300">{palette.inspiration}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-amber-800">No colour palette was saved with this result.</p>
             )}
           </div>
         </TabContent>

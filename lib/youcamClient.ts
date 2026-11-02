@@ -5,7 +5,7 @@
 
 import { getAppSettings } from './storage';
 import { buildBarrierRepairRegimen, buildSafetyFlags, SkinSnapshot } from './recommendations';
-import { AnalysisResponse, SkinAnalysisResult, VTOResult } from './types';
+import { AnalysisResponse, SkinAnalysisResult, SkinConcernMask, VTOResult } from './types';
 
 export function shouldUseRealApi(): boolean {
   if (typeof window !== 'undefined') {
@@ -221,7 +221,17 @@ async function fetchWithRetry(url: string, init: RequestInit, maxRetries = 2): P
  */
 const SKIN_ANALYSIS_TASK_PATH = '/s2s/v2.0/task/skin-analysis';
 const LOOK_VTO_TASK_PATH = '/s2s/v2.0/task/look-vto';
+const MAKEUP_VTO_TASK_PATH = '/s2s/v2.0/task/makeup-vto';
 const FILE_UPLOAD_PATH = '/s2s/v2.0/file';
+
+/**
+ * Cache the last uploaded file_id so the Harmonized Look tab can trigger
+ * per-shade makeup VTO without re-uploading the image.
+ * Cleared on each new analyzeImage call.
+ */
+let _lastFileId: string | null = null;
+export function getLastFileId(): string | null { return _lastFileId; }
+export function clearLastFileId(): void { _lastFileId = null; }
 
 function dataUriToBlob(dataUri: string): Blob {
   const [header, base64] = dataUri.split(',');
@@ -341,6 +351,64 @@ async function pollTask(
   throw new Error('Task polling timed out');
 }
 
+/**
+ * Apply a specific lip shade via the Makeup VTO API.
+ * Uses the uploaded file_id (already on YouCam servers) to avoid re-uploading.
+ * Returns the rendered image URL or null on failure.
+ *
+ * API: POST /s2s/v2.0/task/makeup-vto
+ * Docs: https://docs.perfectcorp.com/reference/description/ai_makeup_vto.md
+ */
+export async function applyMakeupVTO(
+  fileId: string,
+  hexColor: string
+): Promise<string | null> {
+  const apiKey = process.env.NEXT_PUBLIC_YOUCAM_API_KEY;
+  const baseUrl = process.env.NEXT_PUBLIC_YOUCAM_API_URL;
+  if (!apiKey || !baseUrl) return null;
+
+  try {
+    const taskId = await startTask(baseUrl, apiKey, MAKEUP_VTO_TASK_PATH, {
+      src_file_id: fileId,
+      version: '1.0',
+      effects: [
+        {
+          category: 'lip_color',
+          shape: { name: 'original' },
+          style: { type: 'full' },
+          palettes: [
+            {
+              color: hexColor,
+              texture: 'matte',
+              colorIntensity: 75,
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = await pollTask(
+      baseUrl,
+      apiKey,
+      MAKEUP_VTO_TASK_PATH,
+      taskId,
+      1500,
+      30
+    );
+
+    // Success payload: { results: { url: string } } or { results: [{ download_url }] }
+    const url =
+      typeof (result.results as Record<string, unknown>)?.url === 'string'
+        ? ((result.results as Record<string, unknown>).url as string)
+        : Array.isArray(result.results)
+          ? ((result.results as Array<Record<string, unknown>>)[0]?.download_url as string | undefined)
+          : undefined;
+
+    return url ?? null;
+  } catch {
+    return null;
+  }
+}
 async function callRealYouCamAPI(imageData: string): Promise<AnalysisResponse> {
   const apiKey = process.env.NEXT_PUBLIC_YOUCAM_API_KEY;
   const baseUrl = process.env.NEXT_PUBLIC_YOUCAM_API_URL;
@@ -365,7 +433,10 @@ async function callRealYouCamAPI(imageData: string): Promise<AnalysisResponse> {
 
   try {
     // Upload the image once; both tasks can reference the same file_id.
+    // Cache it so the dashboard can trigger per-shade makeup VTO later.
+    clearLastFileId();
     const fileId = await uploadImageFile(baseUrl, apiKey, imageData);
+    _lastFileId = fileId;
 
     // Look VTO requires a template_id — grab the first available template.
     const templateId = await getFirstLookVtoTemplate(baseUrl, apiKey);
@@ -376,6 +447,8 @@ async function callRealYouCamAPI(imageData: string): Promise<AnalysisResponse> {
         src_file_id: fileId,
         // SD actions relevant to Nyirira: spots, texture, redness, radiance.
         dst_actions: ['age_spot', 'texture', 'redness', 'radiance'],
+        // Request individual mask_urls per concern (not a blended overlay).
+        // Each output entry will include mask_urls: [presignedUrl] for overlay.
         format: 'json',
       }),
       startTask(baseUrl, apiKey, LOOK_VTO_TASK_PATH, {
@@ -524,10 +597,20 @@ export function transformSkinData(rawData: Record<string, unknown>): SkinAnalysi
       redness: { level: rednessLevel, description: rednessDescription },
     };
 
+    // Capture per-concern mask URLs from the API response for overlay rendering.
+    const concernMasks: SkinConcernMask[] = output
+      .filter((e) => Array.isArray(e.mask_urls) && (e.mask_urls as string[]).length > 0)
+      .map((e) => ({
+        type: String(e.type),
+        ui_score: Number(e.ui_score) || 0,
+        maskUrls: (e.mask_urls as string[]).filter((u): u is string => typeof u === 'string'),
+      }));
+
     return {
       ...skin,
       safetyFlags: buildSafetyFlags(skin),
       barrierRepairRegimen: buildBarrierRepairRegimen(skin),
+      ...(concernMasks.length > 0 ? { concernMasks } : {}),
     };
   }
 

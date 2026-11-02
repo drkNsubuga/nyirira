@@ -3,6 +3,14 @@
  * Covers YouCam API responses, analysis results, and UI state
  */
 
+export interface SkinConcernMask {
+  /** YouCam dst_action type e.g. "redness", "age_spot", "texture", "radiance" */
+  type: string;
+  ui_score: number;
+  /** Presigned mask image URLs from YouCam (expire ~24h after task completion) */
+  maskUrls: string[];
+}
+
 export interface SkinAnalysisResult {
   healthScore: number; // 0-100
   spots: {
@@ -21,6 +29,8 @@ export interface SkinAnalysisResult {
   };
   safetyFlags: SafetyFlag[];
   barrierRepairRegimen: BarrierRepairProduct[];
+  /** Skin concern overlay masks from the YouCam API (live path only). */
+  concernMasks?: SkinConcernMask[];
 }
 
 export interface SafetyFlag {
@@ -48,6 +58,11 @@ export interface VTOResult {
    * (expires ~2h after the task). Present only on the live-API path.
    */
   tryOnImageUrl?: string;
+  /**
+   * Per-shade makeup-vto rendered URLs keyed by lip shade hex color.
+   * Populated on-demand when the user selects a shade (live API only).
+   */
+  lipShadeVtoUrls?: Record<string, string>;
 }
 
 export interface LipShade {
