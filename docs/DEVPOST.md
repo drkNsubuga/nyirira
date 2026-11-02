@@ -126,3 +126,37 @@ Join us in redefining beauty tech for everyone, starting with melanin-rich skin 
 
 *Built for the YouCam API Skin AI & eCommerce VTO Hackathon*
 - **Responsive Design:** Works seamlessly across desktop and mobile devices.
+
+---
+
+## 5. Crowdsourced Counterfeit Detection & Community Safety Watch
+
+### The Problem
+Uganda's informal beauty market (Kikuubo, Owino, Instagram vendors) is flooded with counterfeit skincare products containing illegal bleaching agents — hydroquinone above 2%, mercury, and corticosteroids. Victims rarely report adverse reactions because no accessible channel exists.
+
+### Our Solution
+Nyirira's Step 4 turns every skin scan into a community safety action:
+
+**Diagnostic Trigger:** When the AI flags high redness (≥40%), moderate/severe spots, or a critical safety flag (chemical bleaching indicators), the app surfaces an interactive prompt — *"Did this barrier damage start after using a recent product?"*
+
+**ReportCounterfeitModal:** A clean bottom-sheet form lets users log:
+- Product name + vendor/brand
+- Purchase location (pre-populated Ugandan markets: Kikuubo, Owino, Nakasero, Instagram vendors, etc.)
+- Optional batch number (UNBS traceability)
+- Multi-select symptom checklist: Burning/Stinging, Skin Thinning/Veins, Ochronosis, Severe Acne
+
+Reports are saved to `localStorage` — simulating a crowdsourced data pipeline with zero backend cost.
+
+**CommunitySafetyWatch Feed:** A searchable, filterable feed in the "Community Watch" tab shows:
+- 🔴 **RED ALERT** — 3+ chemical burn/mercury reports (e.g. Skin Light Body Lotion, Movate Skin Tone Cream)
+- 🟡 **WARNING** — 1–2 reports under review
+- 🟢 **VERIFIED SAFE** — curated authentic products (Nivea, Vaseline)
+
+Filters: product/brand search + Uganda market dropdown + risk level dropdown.
+
+Footer directs serious hazard cases to UNBS (+256 41 4505995).
+
+### Impact
+- Empowers ordinary Ugandan consumers to protect each other
+- Creates a verifiable adverse-reaction dataset for future UNBS integration
+- Reduces harm from counterfeit products in underserved markets

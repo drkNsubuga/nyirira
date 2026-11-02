@@ -397,3 +397,33 @@
 
 **Last Updated**: October 2026  
 **Maintained By**: Dev Team
+
+
+---
+
+## Crowdsourced Counterfeit Detection (v1.0 — COMPLETE) ✅
+
+### Components
+- [x] `types/nyirira.ts` — `CounterfeitReport`, `CommunityAlert`, `AdverseSymptom`, `UGANDA_MARKETS`
+- [x] `components/ReportCounterfeitModal.tsx` — adverse reaction report form with validation
+- [x] `components/CommunitySafetyWatch.tsx` — community feed with search/filter, risk badges, seeded data
+- [x] `AnalysisDashboard.tsx` — 4th "Community Watch" tab + inline diagnostic prompt CTA
+
+### Acceptance Criteria
+- ✅ Modal validates all required fields before submission
+- ✅ Reports persist to `localStorage` key `nyirira_counterfeit_reports`
+- ✅ Feed aggregates reports into alerts with correct risk levels (RED/WARNING/SAFE)
+- ✅ Seed data (2 RED ALERT, 2 VERIFIED SAFE) pre-populated on first load
+- ✅ Search + dual filter (market, risk) work on all screen sizes
+- ✅ Diagnostic prompt triggers when redness ≥ 40%, spots moderate/severe, or critical safety flag
+- ✅ UNBS emergency contact visible in feed footer
+
+---
+
+## v1.1 Crowdsource Enhancements (Q1 2027)
+
+- [ ] Photo evidence upload in ReportCounterfeitModal
+- [ ] Geolocation auto-fill for purchase location
+- [ ] Server-side sync of community reports (Supabase / Firebase)
+- [ ] UNBS webhook integration for verified chemical-hazard escalation
+- [ ] Map view of flagged markets (Leaflet.js)

@@ -32,20 +32,30 @@ Nyirira is a mobile-responsive single-page web application built for the Ugandan
 - **Harmonized Look**: score-aware virtual makeup + outfit color suggestions (Kitenge-inspired palettes) paired with warm undertones for melanin-rich skin
 - Results organized into shadcn-style tabs (Analysis Results / Safety & Regimen / Harmonized Look) to remove over-scrolling
 
-### 4. Client-Side Validation & Error Handling
+
+### 4. Crowdsourced Counterfeit Detection & Community Safety Watch
+- **Diagnostic Prompt**: When skin analysis flags redness ≥ 40%, moderate/severe spots, or a critical safety flag, an interactive alert asks *"Did this barrier damage start after using a recent product?"*
+- **ReportCounterfeitModal**: Bottom-sheet form to log Product Name, Vendor/Brand, Purchase Location (Ugandan markets list), optional Batch Number, and multi-select adverse symptoms (Burning/Stinging, Skin Thinning/Veins, Ochronosis, Severe Acne). Saved to `localStorage`.
+- **CommunitySafetyWatch Feed**: Searchable, filterable community feed in the "Community Watch" dashboard tab:
+  - 🔴 **RED ALERT** (3+ reports) — e.g. Skin Light Body Lotion, Movate Skin Tone Cream
+  - 🟡 **WARNING** (1–2 reports under review)
+  - 🟢 **VERIFIED SAFE** — curated authentic products
+  - Filter by product/brand search, Uganda trading market, and risk level
+  - UNBS emergency contact in footer (+256 41 4505995)
+### 5. Client-Side Validation & Error Handling & Error Handling
 - **Pre-submission checks**: File size, resolution, face detection, quality analysis, orientation (portrait selfies allowed; only extreme aspect ratios rejected)
 - **ML-powered validation**: TensorFlow.js face detection, Tesseract.js privacy checks
 - **Offline error processing**: Comprehensive error code mapping with fallback messages
 - **Real-time feedback**: Validation progress indicators and specific guidance
 - **All errors at once**: The alert lists every validation issue found, not just the first
 
-### 5. Animated Scan Experience
+### 6. Animated Scan Experience
 - **Glowing facial mesh**: SVG mesh of ~39 landmarks reveals over the user's photo as the scan progresses
 - **Scanning beam**: 60fps cosine ping-pong sweep (zero-velocity at both ends — no snapping at reversal) with an afterglow trail; nodes near the beam ramp to a brighter glow via CSS transitions, all driven by `requestAnimationFrame` with zero React re-renders per frame
 - **Micro-copy progress**: Rotating status messages in 5 credibility-building phases (Preparing → Face Detection → Skin Analysis → Color Matching → Finalizing) driven by real progress — validation maps to 0–50%, the API call eases 50→95%, 100% on completion
 - **Viewfinder brackets + progress bar**: Sci-fi scanner aesthetic over the captured photo
 
-### 6. Client-Side Data Persistence
+### 7. Client-Side Data Persistence
 - Results saved to browser localStorage
 - Recent History list on the capture screen with one-tap reopen
 - Clear history option to remove all saved scans at once

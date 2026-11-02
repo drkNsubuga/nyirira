@@ -328,3 +328,98 @@ Returns: VTOResult
 ---
 
 **Document End**
+
+
+---
+
+## 11. Crowdsourced Counterfeit Detection Module (Step 4)
+
+### FR6: Adverse Reaction Reporting
+
+- **FR6.1**: Diagnostic prompt displayed when skin analysis flags:
+  - Redness level >= 40%
+  - Spot severity "moderate" or "severe"
+  - Any safety flag with severity "critical"
+  - Prompt text: *"Did this barrier damage start after using a recent product?"*
+
+- **FR6.2**: Report Counterfeit Modal (`ReportCounterfeitModal.tsx`)
+  - Required fields: Product Name, Vendor/Brand Name, Purchase Location (select from Uganda market list)
+  - Optional field: Batch / Lot Number
+  - Multi-select symptom checklist:
+    - Burning / Stinging
+    - Rapid Skin Thinning / Visible Veins
+    - Ochronosis (Rebound Darkening)
+    - Sudden Severe Acne
+  - Client-side validation before submission
+  - On submit: persist `CounterfeitReport` to `localStorage` key `nyirira_counterfeit_reports`
+  - Success confirmation state shown in-modal
+
+- **FR6.3**: Purchase location options (Uganda markets):
+  - Kikuubo / Downtown Kampala
+  - Owino Market (St. Balikuddembe)
+  - Nakasero Market, Kalerwe Market
+  - Bugolobi / Supermarkets
+  - Instagram Vendor, Facebook Marketplace, WhatsApp Reseller
+  - Other / Unknown
+
+### FR7: Community Safety Watch Feed (`CommunitySafetyWatch.tsx`)
+
+- **FR7.1**: Aggregate `CounterfeitReport[]` from localStorage into `CommunityAlert[]`
+  - Group by product name + vendor brand (case-insensitive)
+  - `reportCount >= 3` → RED_ALERT; 1–2 → WARNING; 0 (curated) → VERIFIED_SAFE
+  - Merge dominant symptoms across grouped reports
+
+- **FR7.2**: Display pre-seeded curated alerts:
+  - 🔴 Skin Light Body Lotion (Kikuubo — 5 reports)
+  - 🔴 Movate Skin Tone Cream (Owino — 4 reports)
+  - 🟢 Nivea Natural Fairness Body Lotion (Verified Safe)
+  - 🟢 Vaseline Intensive Care Cocoa (Verified Safe)
+
+- **FR7.3**: Color-coded risk indicators:
+  - 🔴 RED ALERT — multiple chemical burn / mercury reports
+  - 🟡 WARNING — 1–2 reports, monitoring needed
+  - 🟢 VERIFIED SAFE — authentic / approved products
+
+- **FR7.4**: Search and filter:
+  - Full-text search by product name or brand
+  - Filter by Uganda trading market (dropdown)
+  - Filter by risk level (dropdown)
+
+- **FR7.5**: Stats strip showing total RED ALERT / WARNING / VERIFIED SAFE counts
+
+- **FR7.6**: Footer disclaimer recommending UNBS contact (+256 41 4505995) for verified chemical hazards
+
+### Data Types (types/nyirira.ts)
+
+```typescript
+interface CounterfeitReport {
+  id: string;
+  createdAt: string;          // ISO timestamp
+  productName: string;
+  vendorBrand: string;
+  purchaseLocation: string;
+  batchNumber?: string;
+  symptoms: AdverseSymptom[];
+  healthScoreAtReport?: number;
+}
+
+interface CommunityAlert {
+  id: string;
+  productName: string;
+  vendorBrand: string;
+  location: string;
+  reportCount: number;
+  dominantSymptoms: AdverseSymptom[];
+  lastReported: string;
+  riskLevel: 'RED_ALERT' | 'WARNING' | 'VERIFIED_SAFE';
+}
+```
+
+### localStorage Keys
+- `nyirira_counterfeit_reports` — raw user-submitted reports
+- `nyirira_community_alerts` — reserved for future server sync
+
+### UI Integration
+- Reports accessible via "Community Watch" tab in `AnalysisDashboard.tsx`
+- Inline "Report Product" button always visible in Community Watch tab header
+- Diagnostic prompt CTA shown in Analysis Results tab when skin flags warrant it
