@@ -2,6 +2,7 @@
 
 import CommunitySafetyWatch from './CommunitySafetyWatch';
 import ReportCounterfeitModal from './ReportCounterfeitModal';
+import ImageOverlay from './ImageOverlay';
 import { AnalysisResponse } from '@/lib/types';
 import { applyMakeupVTO, getLastFileId, shouldUseRealApi } from '@/lib/youcamClient';
 import React, { useCallback, useRef, useState } from 'react';
@@ -22,6 +23,7 @@ import {
   Check,
   X,
   Layers,
+  MapPin,
 } from 'lucide-react';
 import { ANALYSIS_KEY } from '@/lib/storage';
 import { harmonizedLookLead } from '@/lib/recommendations';
@@ -138,10 +140,13 @@ function EditableSwatch({
   label,
   color,
   onChange,
+  onApplyVTO,
 }: {
   label: string;
   color: string;
   onChange: (hex: string) => void;
+  /** When provided, fires after a valid colour is committed — used to trigger a VTO render. */
+  onApplyVTO?: (hex: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(color);
@@ -150,8 +155,12 @@ function EditableSwatch({
   const commit = () => {
     const hex = draft.startsWith('#') ? draft : `#${draft}`;
     const valid = /^#[0-9a-fA-F]{6}$/.test(hex);
-    if (valid) onChange(hex);
-    else setDraft(color);
+    if (valid) {
+      onChange(hex);
+      onApplyVTO?.(hex);
+    } else {
+      setDraft(color);
+    }
     setEditing(false);
   };
 
@@ -243,6 +252,10 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
   const [shadeVtoLoading, setShadeVtoLoading] = useState(false);
   const [shadeVtoUrls, setShadeVtoUrls] = useState<Record<string, string>>({});
   const [activeMaskIdx, setActiveMaskIdx] = useState<number | null>(null);
+  /** Palette colour most recently committed for VTO (null = not triggered). */
+  const [paletteVtoHex, setPaletteVtoHex] = useState<string | null>(null);
+  /** Toggle between anatomical marker view and YouCam mask-overlay view. */
+  const [viewMode, setViewMode] = useState<'markers' | 'masks'>('markers');
 
   const handleShadeSelect = useCallback(
     async (idx: number) => {
@@ -262,6 +275,26 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
       }
     },
     [vto.recommendedLipShades, shadeVtoUrls]
+  );
+
+  // Apply a committed palette colour through the same makeup-VTO pipeline as
+  // a lip shade. Results land in shadeVtoUrls keyed by the hex so the Harmonized
+  // Look try-on pane can display them. Only runs on the live-API path.
+  const handlePaletteVTO = useCallback(
+    async (hex: string) => {
+      if (!shouldUseRealApi()) return;
+      const fileId = getLastFileId();
+      if (!fileId) return;
+      if (shadeVtoUrls[hex]) return;
+      setShadeVtoLoading(true);
+      try {
+        const url = await applyMakeupVTO(fileId, hex);
+        if (url) setShadeVtoUrls((prev) => ({ ...prev, [hex]: url }));
+      } finally {
+        setShadeVtoLoading(false);
+      }
+    },
+    [shadeVtoUrls]
   );
 
   const getScoreColor = (score: number) =>
@@ -312,82 +345,109 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
               Skin Health &amp; Safety Score
             </h2>
 
-            {/* Skin image with optional YouCam mask overlay */}
+            {/* Skin image with anatomical markers or YouCam mask overlay */}
             <div className="mb-6">
-              <div className="relative rounded-xl overflow-hidden">
-                <Image
-                  src={imageData}
-                  alt="Scanned skin photo"
-                  width={600}
-                  height={750}
-                  className="w-full rounded-xl object-cover"
-                  sizes="(max-width: 640px) 100vw, 600px"
-                  unoptimized
-                />
-                {activeMask && activeMask.maskUrls[0] && (
-                  <Image
-                    src={activeMask.maskUrls[0]}
-                    alt={`${CONCERN_LABELS[activeMask.type] ?? activeMask.type} mask overlay`}
-                    fill
-                    className="object-cover mix-blend-multiply opacity-70 rounded-xl"
-                    unoptimized
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                )}
-                {activeMask && (
-                  <div className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
-                    <Layers className="w-3 h-3" />
-                    {CONCERN_LABELS[activeMask.type] ?? activeMask.type} overlay
-                    <button
-                      type="button"
-                      aria-label="Clear overlay"
-                      onClick={() => setActiveMaskIdx(null)}
-                      className="ml-1 text-white/70 hover:text-white"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                )}
+              {/* Toggle between marker view (default) and mask-overlay view */}
+              <div className="mb-3 flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={() => setViewMode((prev) => (prev === 'markers' ? 'masks' : 'markers'))}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:border-slate-400 transition-colors"
+                >
+                  {viewMode === 'markers' ? (
+                    <>
+                      <Layers className="w-3.5 h-3.5" />
+                      Show Mask Overlays
+                    </>
+                  ) : (
+                    <>
+                      <MapPin className="w-3.5 h-3.5" />
+                      Show Markers
+                    </>
+                  )}
+                </button>
               </div>
 
-              {/* Concern mask selector (live API only) */}
-              {concernMasks.length > 0 && (
-                <div className="mt-3">
-                  <p className="text-xs text-slate-500 mb-2 flex items-center gap-1">
-                    <Layers className="w-3 h-3" />
-                    Show affected areas:
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {concernMasks.map((mask, i) => {
-                      const label = CONCERN_LABELS[mask.type] ?? mask.type;
-                      const color = CONCERN_COLORS[mask.type] ?? '#64748b';
-                      const active = activeMaskIdx === i;
-                      return (
+              {viewMode === 'markers' ? (
+                <ImageOverlay analysis={analysis} imageData={imageData} />
+              ) : (
+                <>
+                  <div className="relative rounded-xl overflow-hidden">
+                    <Image
+                      src={imageData}
+                      alt="Scanned skin photo"
+                      width={600}
+                      height={750}
+                      className="w-full rounded-xl object-cover"
+                      sizes="(max-width: 640px) 100vw, 600px"
+                      unoptimized
+                    />
+                    {activeMask && activeMask.maskUrls[0] && (
+                      <Image
+                        src={activeMask.maskUrls[0]}
+                        alt={`${CONCERN_LABELS[activeMask.type] ?? activeMask.type} mask overlay`}
+                        fill
+                        className="object-cover mix-blend-multiply opacity-70 rounded-xl"
+                        unoptimized
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    )}
+                    {activeMask && (
+                      <div className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+                        <Layers className="w-3 h-3" />
+                        {CONCERN_LABELS[activeMask.type] ?? activeMask.type} overlay
                         <button
-                          key={mask.type}
                           type="button"
-                          onClick={() => setActiveMaskIdx(active ? null : i)}
-                          aria-pressed={active}
-                          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-all ${
-                            active
-                              ? 'text-white border-transparent'
-                              : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400'
-                          }`}
-                          style={active ? { backgroundColor: color, borderColor: color } : {}}
+                          aria-label="Clear overlay"
+                          onClick={() => setActiveMaskIdx(null)}
+                          className="ml-1 text-white/70 hover:text-white"
                         >
-                          <span
-                            className="w-2 h-2 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: active ? 'rgba(255,255,255,0.7)' : color }}
-                          />
-                          {label}
-                          <span className="opacity-70">{mask.ui_score}</span>
+                          <X className="w-3 h-3" />
                         </button>
-                      );
-                    })}
+                      </div>
+                    )}
                   </div>
-                </div>
+
+                  {/* Concern mask selector (live API only) */}
+                  {concernMasks.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs text-slate-500 mb-2 flex items-center gap-1">
+                        <Layers className="w-3 h-3" />
+                        Show affected areas:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {concernMasks.map((mask, i) => {
+                          const label = CONCERN_LABELS[mask.type] ?? mask.type;
+                          const color = CONCERN_COLORS[mask.type] ?? '#64748b';
+                          const active = activeMaskIdx === i;
+                          return (
+                            <button
+                              key={mask.type}
+                              type="button"
+                              onClick={() => setActiveMaskIdx(active ? null : i)}
+                              aria-pressed={active}
+                              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-all ${
+                                active
+                                  ? 'text-white border-transparent'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400'
+                              }`}
+                              style={active ? { backgroundColor: color, borderColor: color } : {}}
+                            >
+                              <span
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: active ? 'rgba(255,255,255,0.7)' : color }}
+                              />
+                              {label}
+                              <span className="opacity-70">{mask.ui_score}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
@@ -553,30 +613,42 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
             <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{harmonizedLookLead(skinAnalysis)}</p>
           </div>
 
-          {/* VTO result — per-shade takes priority over look-vto */}
+          {/* VTO result — palette colour and per-shade take priority over look-vto */}
           {(() => {
             const activeShade = activeShadeIdx !== null ? vto.recommendedLipShades[activeShadeIdx] : null;
             const shadeUrl = activeShade ? shadeVtoUrls[activeShade.hexColor] : undefined;
-            const displayUrl = shadeUrl ?? vto.tryOnImageUrl;
+            const paletteUrl = paletteVtoHex ? shadeVtoUrls[paletteVtoHex] : undefined;
+            const displayUrl = paletteUrl ?? shadeUrl ?? vto.tryOnImageUrl;
+            const title = paletteUrl
+              ? 'Palette Colour Try-On'
+              : shadeUrl
+                ? `Virtual Try-On — ${activeShade?.name}`
+                : 'Live Virtual Try-On';
             return (
               <div className="mb-6">
                 <p className="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-3 flex items-center gap-2">
                   <WandSparkles className="w-4 h-4" />
-                  {shadeUrl ? `Virtual Try-On — ${activeShade?.name}` : 'Live Virtual Try-On'}
+                  {title}
                 </p>
                 {shadeVtoLoading ? (
                   <div className="flex items-center justify-center h-48 rounded-xl border-2 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
                     <div className="text-center">
                       <Loader2 className="w-8 h-8 text-amber-600 animate-spin mx-auto mb-2" />
                       <p className="text-sm text-amber-700 dark:text-amber-300">
-                        Applying {activeShade?.name ?? 'shade'} via YouCam…
+                        Applying {paletteVtoHex ?? activeShade?.name ?? 'shade'} via YouCam…
                       </p>
                     </div>
                   </div>
                 ) : displayUrl ? (
                   <Image
                     src={displayUrl}
-                    alt={shadeUrl ? `Virtual try-on with ${activeShade?.name}` : 'Your virtual try-on result'}
+                    alt={
+                      paletteUrl
+                        ? 'Virtual try-on with palette colour'
+                        : shadeUrl
+                          ? `Virtual try-on with ${activeShade?.name}`
+                          : 'Your virtual try-on result'
+                    }
                     width={400}
                     height={500}
                     className="w-full max-w-sm rounded-xl border-2 border-amber-300 shadow-md"
@@ -681,6 +753,10 @@ export default function AnalysisDashboard({ analysis, imageData, onBack, onSaved
                     label={label}
                     color={palette[key]}
                     onChange={(hex) => setPalette((p) => ({ ...p, [key]: hex }))}
+                    onApplyVTO={(hex) => {
+                      setPaletteVtoHex(hex);
+                      void handlePaletteVTO(hex);
+                    }}
                   />
                 ))}
                 <div className="text-center">

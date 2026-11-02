@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, X, Send, CheckSquare, Square } from 'lucide-react';
+import { AlertTriangle, X, Send, CheckSquare, Square, Camera } from 'lucide-react';
+import Image from 'next/image';
 import {
   AdverseSymptom,
   ADVERSE_SYMPTOM_LABELS,
@@ -23,6 +24,7 @@ const INITIAL_FORM = {
   purchaseLocation: '',
   batchNumber: '',
   symptoms: [] as AdverseSymptom[],
+  productImageDataUrl: undefined as string | undefined,
 };
 
 export default function ReportCounterfeitModal({
@@ -71,6 +73,7 @@ export default function ReportCounterfeitModal({
       batchNumber: form.batchNumber.trim() || undefined,
       symptoms: form.symptoms,
       healthScoreAtReport: healthScore,
+      productImageDataUrl: form.productImageDataUrl,
     };
 
     try {
@@ -266,6 +269,48 @@ export default function ReportCounterfeitModal({
               </div>
               {errors.symptoms && (
                 <p className="mt-1 text-xs text-red-600">{errors.symptoms}</p>
+              )}
+            </div>
+
+            {/* Product Photo (optional) */}
+            <div>
+              <p className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Product Photo <span className="text-slate-400 font-normal text-xs">(optional — helps others identify the product)</span>
+              </p>
+              {form.productImageDataUrl ? (
+                <div className="relative w-24 h-24">
+                  <Image
+                    src={form.productImageDataUrl}
+                    alt="Product photo preview"
+                    fill
+                    className="object-cover rounded-lg border border-slate-300"
+                    unoptimized
+                  />
+                  <button type="button" onClick={() => setForm(p => ({ ...p, productImageDataUrl: undefined }))}
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-xs"
+                    aria-label="Remove photo">✕</button>
+                </div>
+              ) : (
+                <label className="flex items-center gap-2 cursor-pointer rounded-lg border border-dashed border-slate-300 dark:border-slate-600 px-4 py-3 text-sm text-slate-500 hover:border-amber-400 hover:text-amber-700 transition-colors">
+                  <Camera className="w-4 h-4 flex-shrink-0" />
+                  Take or upload photo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        const dataUrl = ev.target?.result as string;
+                        setForm(p => ({ ...p, productImageDataUrl: dataUrl }));
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
               )}
             </div>
           </div>

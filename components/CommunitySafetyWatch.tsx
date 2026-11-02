@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle, Search, ShieldAlert, Filter, Clock } from 'lucide-react';
+import Image from 'next/image';
 import {
   CommunityAlert,
   CounterfeitReport,
@@ -73,6 +74,9 @@ function buildAlerts(reports: CounterfeitReport[]): CommunityAlert[] {
         }
       }
       existing.riskLevel = existing.reportCount >= 3 ? 'RED_ALERT' : 'WARNING';
+      if (!existing.productImageDataUrl && r.productImageDataUrl) {
+        existing.productImageDataUrl = r.productImageDataUrl;
+      }
     } else {
       map.set(key, {
         id: key,
@@ -83,6 +87,7 @@ function buildAlerts(reports: CounterfeitReport[]): CommunityAlert[] {
         dominantSymptoms: [...r.symptoms],
         lastReported: r.createdAt,
         riskLevel: 'WARNING',
+        ...(r.productImageDataUrl ? { productImageDataUrl: r.productImageDataUrl } : {}),
       });
     }
   }
@@ -242,7 +247,20 @@ export default function CommunitySafetyWatch() {
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{alert.vendorBrand}</p>
                 </div>
-                <RiskBadge level={alert.riskLevel} />
+                <div className="flex items-center gap-2">
+                  {alert.productImageDataUrl && (
+                    <div className="relative w-12 h-12 flex-shrink-0">
+                      <Image
+                        src={alert.productImageDataUrl}
+                        alt={`${alert.productName} photo`}
+                        fill
+                        className="object-cover rounded-lg border border-slate-300"
+                        unoptimized
+                      />
+                    </div>
+                  )}
+                  <RiskBadge level={alert.riskLevel} />
+                </div>
               </div>
 
               <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">

@@ -1,18 +1,19 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Info } from 'lucide-react';
+import { useState } from 'react';
 import Image from 'next/image';
+import { Info, X } from 'lucide-react';
 import { AnalysisResponse } from '@/lib/types';
 
-interface SkinConditionMarker {
+interface FaceMarker {
   id: string;
-  type: 'spot' | 'redness' | 'texture';
+  label: string;
+  type: 'pih_spot' | 'redness' | 'texture' | 'ochronosis' | 'barrier';
+  /** Percentage position within the image */
   x: number;
   y: number;
-  size: number;
-  severity: number;
-  description: string;
+  severity: 'mild' | 'moderate' | 'severe';
+  detail: string;
 }
 
 interface ImageOverlayProps {
@@ -21,109 +22,235 @@ interface ImageOverlayProps {
   className?: string;
 }
 
-function pseudoRandom(seed: string, index: number): number {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = ((hash << 5) - hash) + seed.charCodeAt(i);
-    hash |= 0;
+// Fixed anatomical zones on a front-facing portrait face (% of image width/height).
+// Derived from standard facial thirds: forehead 20-35%, mid-face 35-65%, lower 65-85%.
+const FACE_ZONES = {
+  forehead_center:  { x: 50, y: 22 },
+  forehead_left:    { x: 34, y: 25 },
+  forehead_right:   { x: 66, y: 25 },
+  left_cheek:       { x: 28, y: 55 },
+  right_cheek:      { x: 72, y: 55 },
+  left_cheek_high:  { x: 32, y: 47 },
+  right_cheek_high: { x: 68, y: 47 },
+  nose_bridge:      { x: 50, y: 40 },
+  nose_tip:         { x: 50, y: 52 },
+  left_nasolabial:  { x: 37, y: 60 },
+  right_nasolabial: { x: 63, y: 60 },
+  chin:             { x: 50, y: 76 },
+  left_jaw:         { x: 34, y: 72 },
+  right_jaw:        { x: 66, y: 72 },
+  left_temple:      { x: 20, y: 35 },
+  right_temple:     { x: 80, y: 35 },
+  left_undereye:    { x: 36, y: 44 },
+  right_undereye:   { x: 64, y: 44 },
+};
+
+const MARKER_STYLES: Record<FaceMarker['type'], { bg: string; ring: string; label: string }> = {
+  pih_spot:  { bg: 'bg-amber-700',   ring: 'ring-amber-400',   label: 'PIH Spot'       },
+  redness:   { bg: 'bg-red-500',     ring: 'ring-red-300',     label: 'Inflammation'   },
+  texture:   { bg: 'bg-violet-500',  ring: 'ring-violet-300',  label: 'Texture'        },
+  ochronosis:{ bg: 'bg-slate-800',   ring: 'ring-slate-400',   label: 'Ochronosis'     },
+  barrier:   { bg: 'bg-orange-500',  ring: 'ring-orange-300',  label: 'Barrier Damage' },
+};
+
+const SIZE_BY_SEVERITY = { mild: 10, moderate: 14, severe: 18 };
+
+function buildMarkers(analysis: AnalysisResponse): FaceMarker[] {
+  const { skinAnalysis } = analysis;
+  const markers: FaceMarker[] = [];
+  const { spots, redness, texture, safetyFlags } = skinAnalysis;
+
+  // PIH / Age spots — appear on cheeks, forehead, temples (most common sites for Fitzpatrick V-VI)
+  if (spots.severity !== 'mild' || spots.count > 0) {
+    const pihZones = [
+      FACE_ZONES.left_cheek_high,
+      FACE_ZONES.right_cheek_high,
+      FACE_ZONES.forehead_left,
+      FACE_ZONES.forehead_right,
+      FACE_ZONES.left_temple,
+      FACE_ZONES.right_temple,
+    ];
+    const count = spots.severity === 'severe' ? 4 : spots.severity === 'moderate' ? 3 : 2;
+    for (let i = 0; i < count && i < pihZones.length; i++) {
+      markers.push({
+        id: `pih-${i}`,
+        label: `PIH Spot ${i + 1}`,
+        type: 'pih_spot',
+        x: pihZones[i].x,
+        y: pihZones[i].y,
+        severity: spots.severity,
+        detail: `Post-inflammatory hyperpigmentation detected — ${spots.description || spots.severity + ' severity'}`,
+      });
+    }
   }
-  return Math.abs(Math.sin(hash + index * 12345) * 10000) / 10000;
+
+  // Redness / Inflammation — nasolabial folds, cheeks, nose (classic rosacea/irritation zones)
+  if (redness.level >= 20) {
+    const rednessZones = redness.level >= 50
+      ? [FACE_ZONES.left_cheek, FACE_ZONES.right_cheek, FACE_ZONES.nose_tip, FACE_ZONES.left_nasolabial]
+      : redness.level >= 35
+      ? [FACE_ZONES.left_cheek, FACE_ZONES.right_cheek, FACE_ZONES.nose_bridge]
+      : [FACE_ZONES.nose_bridge, FACE_ZONES.left_nasolabial];
+
+    rednessZones.forEach((zone, i) => {
+      markers.push({
+        id: `redness-${i}`,
+        label: `Inflammation Zone`,
+        type: 'redness',
+        x: zone.x,
+        y: zone.y,
+        severity: redness.level >= 60 ? 'severe' : redness.level >= 35 ? 'moderate' : 'mild',
+        detail: redness.description || `Redness level ${redness.level}% — inflammatory response detected`,
+      });
+    });
+  }
+
+  // Texture irregularity — forehead, nose, chin (T-zone typical)
+  if (texture.roughness >= 30) {
+    const textureZones = texture.roughness >= 60
+      ? [FACE_ZONES.forehead_center, FACE_ZONES.nose_tip, FACE_ZONES.chin]
+      : [FACE_ZONES.forehead_center, FACE_ZONES.nose_tip];
+
+    textureZones.forEach((zone, i) => {
+      markers.push({
+        id: `texture-${i}`,
+        label: 'Texture Irregularity',
+        type: 'texture',
+        x: zone.x,
+        y: zone.y,
+        severity: texture.roughness >= 60 ? 'severe' : texture.roughness >= 40 ? 'moderate' : 'mild',
+        detail: `Roughness ${texture.roughness}%, smoothness ${texture.smoothness}% — ${texture.description || 'uneven skin texture detected'}`,
+      });
+    });
+  }
+
+  // Ochronosis / Critical barrier damage — jaw and chin area (common ochronosis site)
+  const hasCritical = safetyFlags.some((f) => f.severity === 'critical' && f.id !== 'toxic-bleaching' && f.id !== 'equatorial-uv');
+  if (hasCritical && skinAnalysis.healthScore < 60) {
+    [FACE_ZONES.left_jaw, FACE_ZONES.right_jaw, FACE_ZONES.chin].forEach((zone, i) => {
+      markers.push({
+        id: `barrier-${i}`,
+        label: 'Barrier Damage',
+        type: 'barrier',
+        x: zone.x,
+        y: zone.y,
+        severity: skinAnalysis.healthScore < 50 ? 'severe' : 'moderate',
+        detail: 'Epidermal barrier compromise detected — skin may be thin, reactive, or show rebound darkening',
+      });
+    });
+  }
+
+  return markers;
 }
 
 export default function ImageOverlay({ analysis, imageData, className = '' }: ImageOverlayProps) {
-  const [zoom, setZoom] = useState(1);
-  const [selectedMarker, setSelectedMarker] = useState<SkinConditionMarker | null>(null);
-  const [showTooltips, setShowTooltips] = useState(true);
+  const [selected, setSelected] = useState<FaceMarker | null>(null);
+  const markers = buildMarkers(analysis);
 
-  const markers = useMemo<SkinConditionMarker[]>(() => {
-    const seed = `${analysis.timestamp}-${analysis.skinAnalysis.healthScore}`;
-    return [
-      ...(Array.from({ length: analysis.skinAnalysis.spots.count }, (_, i) => ({
-        id: `spot-${i}`, type: 'spot' as const,
-        x: 20 + i * 15 + pseudoRandom(seed, i) * 10,
-        y: 30 + i * 10 + pseudoRandom(seed, i + 100) * 10,
-        size: 8 + pseudoRandom(seed, i + 200) * 4,
-        severity: 3 + pseudoRandom(seed, i + 300) * 5,
-        description: 'Hyperpigmented spot detected'
-      }))),
-      ...(Array.from({ length: Math.floor(analysis.skinAnalysis.redness.level / 20) }, (_, i) => ({
-        id: `redness-${i}`, type: 'redness' as const,
-        x: 40 + i * 20 + pseudoRandom(seed, i + 400) * 10,
-        y: 50 + i * 15 + pseudoRandom(seed, i + 500) * 10,
-        size: 15 + pseudoRandom(seed, i + 600) * 10,
-        severity: analysis.skinAnalysis.redness.level / 10,
-        description: 'Mild redness detected'
-      }))),
-      ...(Array.from({ length: Math.floor(analysis.skinAnalysis.texture.smoothness / 25) }, (_, i) => ({
-        id: `texture-${i}`, type: 'texture' as const,
-        x: 60 + i * 12 + pseudoRandom(seed, i + 700) * 10,
-        y: 25 + i * 18 + pseudoRandom(seed, i + 800) * 10,
-        size: 12 + pseudoRandom(seed, i + 900) * 6,
-        severity: analysis.skinAnalysis.texture.smoothness / 10,
-        description: 'Texture irregularity detected'
-      })))
-    ];
-  }, [analysis]);
-
-  const getMarkerColor = (type: SkinConditionMarker['type']) => {
-    switch (type) {
-      case 'spot': return 'rgba(139, 69, 19, 0.7)';
-      case 'redness': return 'rgba(220, 38, 38, 0.6)';
-      case 'texture': return 'rgba(75, 85, 99, 0.6)';
-    }
-  };
-
-  const getMarkerBorder = (type: SkinConditionMarker['type']) => {
-    switch (type) {
-      case 'spot': return '2px solid #8B4513';
-      case 'redness': return '2px solid #DC2626';
-      case 'texture': return '2px solid #4B5563';
-    }
-  };
-
-  const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.5, 3));
-  const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.5, 0.5));
-  const handleReset = () => { setZoom(1); setSelectedMarker(null); };
-  const handleMarkerClick = (marker: SkinConditionMarker) => { setSelectedMarker(selectedMarker?.id === marker.id ? null : marker); };
+  const toggle = (marker: FaceMarker) =>
+    setSelected((prev) => (prev?.id === marker.id ? null : marker));
 
   return (
-    <div className={`relative ${className}`}>
-      <div className='relative flex justify-center overflow-hidden rounded-lg bg-gray-100'>
-        <div className='relative transition-transform duration-200' style={{ transform: `scale(${zoom})` }}>
-          {/* Fit inside the box while preserving the aspect ratio — a forced
-              w-full + max-height stretches tall portrait selfies. h/w-auto with
-              max constraints scales the image down without distorting it, and
-              the wrapper stays image-sized so the % markers line up. */}
-          <Image
-            src={imageData}
-            alt='Skin analysis'
-            width={600}
-            height={800}
-            className='block h-auto w-auto max-h-[600px] max-w-full object-contain'
-            sizes="(max-width: 600px) 100vw, 600px"
+    <div className={`space-y-3 ${className}`}>
+      {/* Image with markers */}
+      <div className="relative overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800">
+        <Image
+          src={imageData}
+          alt="Skin analysis photo"
+          width={600}
+          height={750}
+          className="block h-auto w-full object-cover rounded-xl"
+          sizes="(max-width: 640px) 100vw, 600px"
+          unoptimized
+        />
+
+        {/* Anatomical markers */}
+        {markers.map((marker) => {
+          const style = MARKER_STYLES[marker.type];
+          const size = SIZE_BY_SEVERITY[marker.severity];
+          const isSelected = selected?.id === marker.id;
+          return (
+            <button
+              key={marker.id}
+              type="button"
+              aria-label={`${marker.label} — ${marker.severity}`}
+              onClick={() => toggle(marker)}
+              className={`absolute rounded-full transition-all duration-150 ${style.bg} ring-2 ${style.ring} opacity-80 hover:opacity-100 hover:scale-125 focus:outline-none ${isSelected ? 'scale-125 ring-4 opacity-100' : ''}`}
+              style={{
+                left: `${marker.x}%`,
+                top: `${marker.y}%`,
+                width: `${size}px`,
+                height: `${size}px`,
+                transform: 'translate(-50%, -50%)',
+              }}
+            >
+              {/* Pulse animation on severe markers */}
+              {marker.severity === 'severe' && (
+                <span
+                  className={`absolute inset-0 rounded-full ${style.bg} animate-ping opacity-50`}
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Selected marker detail */}
+      {selected && (
+        <div className="flex items-start gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 shadow-sm">
+          <div
+            className={`mt-0.5 w-3 h-3 rounded-full flex-shrink-0 ${MARKER_STYLES[selected.type].bg}`}
           />
-          <div className='absolute inset-0'>
-            {markers.map((marker) => (
-              <div key={marker.id} className={`absolute cursor-pointer transition-all duration-200 hover:scale-110 ${selectedMarker?.id === marker.id ? 'ring-4 ring-blue-400 z-10' : ''}`} style={{ left: `${marker.x}%`, top: `${marker.y}%`, transform: 'translate(-50%, -50%)', width: `${marker.size}px`, height: `${marker.size}px`, backgroundColor: getMarkerColor(marker.type), border: getMarkerBorder(marker.type), borderRadius: '50%' }} onClick={() => handleMarkerClick(marker)}>
-                <div className='absolute -top-6 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded whitespace-nowrap'>{marker.severity.toFixed(1)}</div>
-              </div>
-            ))}
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm text-slate-900 dark:text-slate-100">{selected.label}</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{selected.detail}</p>
+            <p className="text-xs font-medium mt-1 capitalize">
+              Severity:{' '}
+              <span
+                className={
+                  selected.severity === 'severe'
+                    ? 'text-red-600'
+                    : selected.severity === 'moderate'
+                    ? 'text-amber-600'
+                    : 'text-emerald-600'
+                }
+              >
+                {selected.severity}
+              </span>
+            </p>
           </div>
-          <div className='absolute top-2 right-2 flex gap-1 bg-white bg-opacity-90 rounded-lg shadow-md p-1'>
-            <button onClick={handleZoomIn} className='p-2 hover:bg-gray-100 rounded transition-colors' title='Zoom in'><ZoomIn className='w-4 h-4' /></button>
-            <button onClick={handleZoomOut} className='p-2 hover:bg-gray-100 rounded transition-colors' title='Zoom out'><ZoomOut className='w-4 h-4' /></button>
-            <button onClick={handleReset} className='p-2 hover:bg-gray-100 rounded transition-colors' title='Reset view'><RotateCcw className='w-4 h-4' /></button>
-            <button onClick={() => setShowTooltips(!showTooltips)} className={`p-2 hover:bg-gray-100 rounded transition-colors ${showTooltips ? 'bg-blue-100' : ''}`} title={showTooltips ? 'Hide tooltips' : 'Show tooltips'}><Info className='w-4 h-4' /></button>
-          </div>
+          <button
+            type="button"
+            aria-label="Close detail"
+            onClick={() => setSelected(null)}
+            className="text-slate-400 hover:text-slate-600 flex-shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-      </div>
-      <div className='mt-3 flex flex-wrap gap-4 text-sm'>
-        <div className='flex items-center gap-2'><div className='w-4 h-4 rounded-full' style={{ backgroundColor: getMarkerColor('spot') }} /><span>Hyperpigmented Spots ({analysis.skinAnalysis.spots.count > 0 ? analysis.skinAnalysis.spots.count : analysis.skinAnalysis.spots.severity})</span></div>
-        <div className='flex items-center gap-2'><div className='w-4 h-4 rounded-full' style={{ backgroundColor: getMarkerColor('redness') }} /><span>Redness Level ({analysis.skinAnalysis.redness.level})</span></div>
-        <div className='flex items-center gap-2'><div className='w-4 h-4 rounded-full' style={{ backgroundColor: getMarkerColor('texture') }} /><span>Texture Issues ({analysis.skinAnalysis.texture.smoothness})</span></div>
-      </div>
-      {selectedMarker && (<div className='mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg'><div className='flex items-start gap-2'><Info className='w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0' /><div><h4 className='font-semibold text-blue-900 capitalize'>{selectedMarker.type}</h4><p className='text-sm text-blue-700'>{selectedMarker.description}</p><p className='text-xs text-blue-600 mt-1'>Severity: {selectedMarker.severity.toFixed(1)}/10 | Position: ({selectedMarker.x.toFixed(0)}%, {selectedMarker.y.toFixed(0)}%)</p></div></div></div>)}
-      <div className='mt-3 p-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-lg'><div className='flex items-center justify-between'><div><h4 className='font-semibold'>Overall Skin Health</h4><p className='text-sm opacity-90'>Score: {analysis.skinAnalysis.healthScore}/100</p></div><div className='text-right'><div className='text-2xl font-bold'>{analysis.skinAnalysis.healthScore}</div><div className='text-xs opacity-90'>Out of 100</div></div></div></div>
+      )}
+
+      {/* Legend */}
+      {markers.length > 0 && (
+        <div className="flex flex-wrap gap-3 text-xs text-slate-600 dark:text-slate-400">
+          {(Object.keys(MARKER_STYLES) as FaceMarker['type'][])
+            .filter((type) => markers.some((m) => m.type === type))
+            .map((type) => (
+              <span key={type} className="flex items-center gap-1.5">
+                <span className={`w-3 h-3 rounded-full flex-shrink-0 ${MARKER_STYLES[type].bg}`} />
+                {MARKER_STYLES[type].label}
+              </span>
+            ))}
+          <span className="flex items-center gap-1 ml-auto">
+            <Info className="w-3 h-3" />
+            Tap marker for detail
+          </span>
+        </div>
+      )}
+
+      {markers.length === 0 && (
+        <p className="text-xs text-emerald-600 font-medium">No significant skin concerns detected in this scan.</p>
+      )}
     </div>
   );
 }

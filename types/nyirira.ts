@@ -44,6 +44,8 @@ export interface CounterfeitReport {
   symptoms: AdverseSymptom[];
   /** Skin health score at the time of the report (from current analysis). */
   healthScoreAtReport?: number;
+  /** Optional base64 data URL of the product photo. */
+  productImageDataUrl?: string;
 }
 
 /** Aggregated community alert derived from one or more reports. */
@@ -62,6 +64,8 @@ export interface CommunityAlert {
    * VERIFIED_SAFE — manually curated safe product (reportCount === 0)
    */
   riskLevel: 'RED_ALERT' | 'WARNING' | 'VERIFIED_SAFE';
+  /** Optional base64 data URL of the product photo. */
+  productImageDataUrl?: string;
 }
 
 /** localStorage keys for crowdsource data. */
