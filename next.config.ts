@@ -40,6 +40,9 @@ const nextConfig: NextConfig = {
   // provides benefit here — static export is what Cloudflare Pages serves.
   cacheComponents: false,
   partialPrefetching: false,
+  experimental: {
+    agentUpgrade: "security",
+  },
   turbopack: {
     rules: {
       "*.css": {
