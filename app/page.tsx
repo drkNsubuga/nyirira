@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { AlertCircle, Camera, Clock3, Download, Loader2, RotateCcw, Share2, Settings, Sparkles, Trash2, X, HelpCircle } from 'lucide-react';
+import { AlertCircle, Camera, Clock3, Download, Loader2, RotateCcw, Share2, Settings, Sparkles, Trash2, X, HelpCircle, Moon, Sun } from 'lucide-react';
 import CameraCapture from '@/components/CameraCapture';
 import AnalysisDashboard from '@/components/AnalysisDashboard';
 import ScanOverlay from '@/components/ScanOverlay';
@@ -21,6 +21,7 @@ import {
   saveAnalysis,
 } from '@/lib/storage';
 import { useLocalStorageValue } from '@/lib/useLocalStorage';
+import { applyTheme, setStoredTheme, THEME_KEY } from '@/lib/theme';
 import { analyzeImage } from '@/lib/youcamClient';
 import { compressImage } from '@/lib/image';
 import { runFullImageValidation } from '@/lib/advancedValidation';
@@ -270,6 +271,12 @@ export default function Home() {
   // after hydration without a manual setState-in-effect.
   const history = parseHistory(useLocalStorageValue(HISTORY_KEY));
   const settings = parseSettings(useLocalStorageValue(SETTINGS_KEY));
+  const theme = useLocalStorageValue(THEME_KEY) === 'dark' ? 'dark' : 'light';
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setStoredTheme(next);
+    applyTheme(next);
+  };
 
   // Interactive state (capture/processing/results) stays in useState.
   // No restore-on-reload: a page refresh always lands on the original capture
@@ -536,7 +543,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-emerald-50 to-amber-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-      <header className="sticky top-0 z-40 bg-white shadow-sm dark:bg-slate-900">
+      <header className="sticky top-0 z-40 bg-white shadow-sm dark:bg-slate-900 dark:border-slate-700">
         <div className="max-w-4xl mx-auto px-4 py-6 flex items-center justify-between gap-3">
           <Link
             href="/"
@@ -552,16 +559,24 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="inline-flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 p-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            <button
+              type="button"
               onClick={handleShowHistory}
               aria-label="View history"
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <Clock3 className="w-4 h-4" />
               History
             </button>
             <Link
               href="/settings"
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <Settings className="w-4 h-4" />
               Settings
@@ -856,7 +871,7 @@ export default function Home() {
             <div>
               <h3 className="font-semibold text-white mb-2">Privacy</h3>
               <p className="text-sm">
-                Your images are analyzed locally. No data is stored on servers.
+                Your privacy comes first. All photo analysis happens securely on your device. If you use the optional live API, images are processed and deleted within 24 hours, while community reports stay safely in your browser.
               </p>
             </div>
           </div>

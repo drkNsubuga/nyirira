@@ -43,7 +43,7 @@ export function buildSafetyFlags(skin: SkinSnapshot): SafetyFlag[] {
     severity: 'critical',
     title: 'Danger: Illegal Bleaching Agents Common in Uganda Markets',
     description:
-      'Products sold in Kikuubo, Owino Market and online contain mercury, high-strength hydroquinone (>2%), and unlabelled corticosteroids. On Fitzpatrick V-VI skin these cause ochronosis (permanent bluish-black darkening), skin thinning, visible veins, and mercury kidney damage. The damage is often irreversible.',
+      'Some products sold in Kikuubo, Owino Market and online contain mercury, high-strength hydroquinone (>2%), and unlabelled corticosteroids. On Fitzpatrick V-VI skin these cause ochronosis (permanent bluish-black darkening), skin thinning, visible veins, and mercury kidney damage. The damage is often irreversible.',
     recommendation:
       'Never buy skin-lightening creams without checking the UNBS registration number. Safe brighteners available in pharmacies: Niacinamide 5%, Vitamin C, and Azelaic Acid 10-15%. Avoid any product labelled "fast-acting" or sold without an ingredient list.',
   });

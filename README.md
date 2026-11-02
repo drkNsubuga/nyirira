@@ -1,9 +1,9 @@
-# Nyirira 🌍✨
+# Nyirira ✨
 
 [![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com)
 [![Tests](https://img.shields.io/badge/tests-150%20passing-brightgreen.svg)](#testing)
 [![Coverage](https://img.shields.io/badge/coverage-70%25%2B-brightgreen.svg)](#testing)
-[![Next.js](https://img.shields.io/badge/Next.js-16%2B-black.svg?logo=next.js)](https://nextjs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-16.4.3-black.svg?logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4%2B-38B2AC.svg?logo=tailwind-css)](https://tailwindcss.com)
 [![pnpm](https://img.shields.io/badge/pnpm-9%2B-F69220.svg?logo=pnpm)](https://pnpm.io)
@@ -15,52 +15,56 @@ Nyirira is a mobile-responsive single-page web application built for the Ugandan
 
 ## Features
 
-### 1. Selfie Capture & Image Upload
-- Take a live selfie using device camera (`navigator.mediaDevices`)
-- Upload existing photos (JPG, PNG; max 10MB)
-- Instant preview before analysis
-- Mobile-first responsive design
+### 1. Selfie Capture and Image Upload
+- Live selfie via device camera or file upload (JPG/PNG, max 10MB)
+- ML quality validation: face detection (TensorFlow.js), blur/lighting/orientation checks
+- All validation runs client-side -- images never leave the device during this step
 
-### 2. Dual AI Analysis
-- **Skin Diagnostics**: Detects spots, texture, redness, and provides a health score (0-100)
-- **Virtual Try-On (VTO) + Colorimetry**: Suggests warm-toned lip shades and Kitenge-inspired outfit color palettes harmonizing with the user's complexion
+### 2. Dual YouCam API Analysis
+- **Skin Diagnostics** (/task/skin-analysis): spots, texture, redness, radiance scored via YouCam uiskin_score (not client-computed). Optimised for Fitzpatrick V-VI
+- **Virtual Try-On** (/task/look-vto + /task/makeup-vto): rendered try-on image, warm-toned lip shades, Kitenge-inspired palettes
+- NEXT_PUBLIC_USE_REAL_API toggle + per-browser Settings switch
 
-### 3. Localized Results Dashboard (tabbed)
-- **Skin Health & Safety Score** with visual indicators — the score comes straight from the YouCam API (`uiskin_score`, 0-100); it is **not** client-computed
-- **Safety Flags**: score-driven critical warnings against bleaching agents (hydroquinone, mercury, kojic acid); recommendations for safe alternatives (niacinamide, vitamin C, turmeric)
-- **Barrier Repair Regimen**: score-derived, curated list of ingredients common in East African pharmacies (glycerin, niacinamide, shea butter, natural oils)
-- **Harmonized Look**: score-aware virtual makeup + outfit color suggestions (Kitenge-inspired palettes) paired with warm undertones for melanin-rich skin
-- Results organized into shadcn-style tabs (Analysis Results / Safety & Regimen / Harmonized Look) to remove over-scrolling
+### 3. Results Dashboard: 4 Tabs
 
+**Analysis Results** (Microscope tab)
+- Health score ring (0-100), 4-band: critical <50 / repair 50-69 / balance 70-84 / thrive 85+
+- Anatomical damage markers on real facial zones: PIH Spots (amber), Inflammation (red), Texture (violet), Barrier Damage (orange) -- severe markers pulse
+- Toggle to YouCam mask overlays (redness, age_spot, texture, radiance) when live API is active
+- Counterfeit prompt triggers on redness >= 40%, moderate/severe spots, or critical safety flag
 
-### 4. Crowdsourced Counterfeit Detection & Community Safety Watch
-- **Diagnostic Prompt**: When skin analysis flags redness ≥ 40%, moderate/severe spots, or a critical safety flag, an interactive alert asks *"Did this barrier damage start after using a recent product?"*
-- **ReportCounterfeitModal**: Bottom-sheet form to log Product Name, Vendor/Brand, Purchase Location (Ugandan markets list), optional Batch Number, and multi-select adverse symptoms (Burning/Stinging, Skin Thinning/Veins, Ochronosis, Severe Acne). Saved to `localStorage`.
-- **CommunitySafetyWatch Feed**: Searchable, filterable community feed in the "Community Watch" dashboard tab:
-  - 🔴 **RED ALERT** (3+ reports) — e.g. Skin Light Body Lotion, Movate Skin Tone Cream
-  - 🟡 **WARNING** (1–2 reports under review)
-  - 🟢 **VERIFIED SAFE** — curated authentic products
-  - Filter by product/brand search, Uganda trading market, and risk level
-  - UNBS emergency contact in footer (+256 41 4505995)
-### 5. Client-Side Validation & Error Handling
-- **Pre-submission checks**: File size, resolution, face detection, quality analysis, orientation (portrait selfies allowed; only extreme aspect ratios rejected)
-- **ML-powered validation**: TensorFlow.js face detection, Tesseract.js privacy checks
-- **Offline error processing**: Comprehensive error code mapping with fallback messages
-- **Real-time feedback**: Validation progress indicators and specific guidance
-- **All errors at once**: The alert lists every validation issue found, not just the first
+**Safety & Regimen** (Shield tab)
+- Flags targeting Uganda-specific damage: ochronosis, PIH cycle, mercury/steroid abuse, equatorial UV (index 10-14)
+- Named Ugandan brands + UGX prices: Vaseline, Bepanthen (Mulago Hospital pharmacy), raw shea from Owino Market, CeraVe at Uchumi
+- Critical band directs to Mulago Hospital dermatology clinic
 
-### 6. Animated Scan Experience
-- **Glowing facial mesh**: SVG mesh of ~39 landmarks reveals over the user's photo as the scan progresses
-- **Scanning beam**: 60fps cosine ping-pong sweep (zero-velocity at both ends — no snapping at reversal) with an afterglow trail; nodes near the beam ramp to a brighter glow via CSS transitions, all driven by `requestAnimationFrame` with zero React re-renders per frame
-- **Micro-copy progress**: Rotating status messages in 5 credibility-building phases (Preparing → Face Detection → Skin Analysis → Color Matching → Finalizing) driven by real progress — validation maps to 0–50%, the API call eases 50→95%, 100% on completion
-- **Viewfinder brackets + progress bar**: Sci-fi scanner aesthetic over the captured photo
+**Harmonized Look** (Palette tab)
+- Per-shade VTO: tap any lip shade to trigger YouCam Makeup VTO API; result shown inline, cached per shade
+- Colour palette picker: click any swatch to open the native colour-picker wheel; committing triggers live makeup VTO; hex input syncs in real time
+- Score-aware Kitenge-inspired lead text
 
-### 7. Client-Side Data Persistence
-- Results saved to browser localStorage
-- Recent History list on the capture screen with one-tap reopen
-- Clear history option to remove all saved scans at once
-- No backend database required (MVP cost-optimization)
-- Privacy-first: images analyzed locally, no server storage
+**Community Watch** (Users tab)
+- Report form with product photo proof (camera or file, stored as base64)
+- Feed: RED ALERT / WARNING / VERIFIED SAFE tiers with product thumbnail
+- Search + filter by Uganda market (Kikuubo, Owino, etc.) and risk level
+
+### 4. Scan Comparison and History
+- Side-by-side scan photos with animated SVG score rings showing delta badge (+/- pts)
+- Stacked metric bars (grey = previous, coloured = current) for Redness, Smoothness, Roughness
+- Spots severity trend; always-visible summary banner; expandable detail panel
+
+### 5. Dark Mode
+- One-tap toggle in the header (Moon/Sun icon); persisted to localStorage
+- Full dark variants across header, footer, settings, all dashboard tabs, modals, community feed
+
+### 6. Animated Scan
+- Glowing SVG facial mesh (~39 landmarks) + 60fps cosine scanning beam with afterglow
+- 5-phase micro-copy: Preparing -> Face Detection -> Skin Analysis -> Color Matching -> Finalizing
+
+### 7. Privacy
+- **Your privacy comes first.** All photo analysis runs locally on your device
+- Optional live API: image sent to Perfect Corp (YouCam), deleted within 24 hours
+- Community reports stored in your browser only -- no backend, no accounts required
 
 ## Tech Stack
 

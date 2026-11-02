@@ -25,8 +25,8 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-amber-50">
-      <header className="bg-white shadow-sm">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-amber-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      <header className="bg-white shadow-sm dark:bg-slate-900 dark:shadow-slate-800">
         <div className="max-w-4xl mx-auto px-4 py-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-2 text-slate-700 hover:text-slate-900">
@@ -35,7 +35,7 @@ export default function SettingsPage() {
             </Link>
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-emerald-600" />
-              <h1 className="text-2xl font-bold text-slate-900">Nyirira Settings</h1>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Nyirira Settings</h1>
             </div>
           </div>
         </div>
@@ -43,14 +43,14 @@ export default function SettingsPage() {
 
       <main className="max-w-3xl mx-auto px-4 py-10">
         <div className="grid gap-6">
-          <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-4">App Preferences</h2>
+          <section className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-4">App Preferences</h2>
 
             <div className="space-y-4">
-              <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4">
+              <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
                 <div>
-                  <p className="font-medium text-slate-900">Use live API</p>
-                  <p className="text-sm text-slate-600">Toggle real YouCam integration when credentials are present.</p>
+                  <p className="font-medium text-slate-900 dark:text-slate-100">Use live API</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Toggle real YouCam integration when credentials are present.</p>
                 </div>
                 <button
                   type="button"
@@ -68,20 +68,20 @@ export default function SettingsPage() {
                 </button>
               </label>
 
-              <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4">
+              <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
                 <div>
-                  <p className="font-medium text-slate-900">Push notifications</p>
-                  <p className="text-sm text-slate-600">Reminder updates for skin care and safety guidance.</p>
+                  <p className="font-medium text-slate-900 dark:text-slate-100">Push notifications</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Reminder updates for skin care and safety guidance.</p>
                 </div>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
                   Coming soon
                 </span>
               </label>
 
-              <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4">
+              <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
                 <div>
-                  <p className="font-medium text-slate-900">Share results</p>
-                  <p className="text-sm text-slate-600">Enable native share / clipboard sharing from the dashboard.</p>
+                  <p className="font-medium text-slate-900 dark:text-slate-100">Share results</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Enable native share / clipboard sharing from the dashboard.</p>
                 </div>
                 <button
                   type="button"
@@ -101,10 +101,10 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-4">Appearance</h2>
+          <section className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-4">Appearance</h2>
 
-            <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4">
+            <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
               <div className="flex items-center gap-3">
                 {theme === 'dark' ? (
                   <Moon className="w-5 h-5 text-emerald-600" aria-hidden="true" />
@@ -112,8 +112,8 @@ export default function SettingsPage() {
                   <Sun className="w-5 h-5 text-amber-500" aria-hidden="true" />
                 )}
                 <div>
-                  <p className="font-medium text-slate-900">Dark mode</p>
-                  <p className="text-sm text-slate-600">Easier viewing in low light.</p>
+                  <p className="font-medium text-slate-900 dark:text-slate-100">Dark mode</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Easier viewing in low light.</p>
                 </div>
               </div>
               <button
@@ -135,18 +135,18 @@ export default function SettingsPage() {
             </label>
           </section>
 
-          <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-4">Connected Apps</h2>
+          <section className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-4">Connected Apps</h2>
 
             <div className="space-y-4">
-              <div className="flex items-center justify-between rounded-xl border border-slate-200 p-4">
+              <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 p-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
                     <Globe className="w-4 h-4" />
                   </div>
                   <div>
-                    <p className="font-medium text-slate-900">Google</p>
-                    <p className="text-sm text-slate-600">Account linking is not available yet.</p>
+                    <p className="font-medium text-slate-900 dark:text-slate-100">Google</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Account linking is not available yet.</p>
                   </div>
                 </div>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
@@ -154,14 +154,14 @@ export default function SettingsPage() {
                 </span>
               </div>
 
-              <div className="flex items-center justify-between rounded-xl border border-slate-200 p-4">
+              <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 p-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700">
                     <ShieldCheck className="w-4 h-4" />
                   </div>
                   <div>
-                    <p className="font-medium text-slate-900">Facebook</p>
-                    <p className="text-sm text-slate-600">Account linking is not available yet.</p>
+                    <p className="font-medium text-slate-900 dark:text-slate-100">Facebook</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Account linking is not available yet.</p>
                   </div>
                 </div>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">

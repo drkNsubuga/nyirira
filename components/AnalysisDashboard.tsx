@@ -136,6 +136,11 @@ const CONCERN_COLORS: Record<string, string> = {
   firmness: '#14b8a6',
 };
 
+/**
+ * Colour swatch with an embedded colour-picker wheel.
+ * Clicking the swatch opens the native colour picker immediately.
+ * The hex input below stays in sync. Committing (blur / Enter) fires onChange + onApplyVTO.
+ */
 function EditableSwatch({
   label,
   color,
@@ -145,101 +150,61 @@ function EditableSwatch({
   label: string;
   color: string;
   onChange: (hex: string) => void;
-  /** When provided, fires after a valid colour is committed — used to trigger a VTO render. */
   onApplyVTO?: (hex: string) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(color);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const pickerRef = useRef<HTMLInputElement>(null);
+  const [hex, setHex] = useState(color);
 
-  const commit = () => {
-    const hex = draft.startsWith('#') ? draft : `#${draft}`;
-    const valid = /^#[0-9a-fA-F]{6}$/.test(hex);
-    if (valid) {
-      onChange(hex);
-      onApplyVTO?.(hex);
-    } else {
-      setDraft(color);
+  // Sync when parent resets
+  if (hex !== color && document.activeElement !== pickerRef.current) {
+    setHex(color);
+  }
+
+  const commit = (value: string) => {
+    const h = value.startsWith('#') ? value : `#${value}`;
+    if (/^#[0-9a-fA-F]{6}$/.test(h)) {
+      onChange(h);
+      onApplyVTO?.(h);
     }
-    setEditing(false);
   };
 
   return (
     <div className="text-center">
-      <div className="relative mx-auto mb-2 w-16 h-16 group">
-        <div
-          className="w-16 h-16 rounded-lg shadow-md border-2 border-amber-300 cursor-pointer"
-          style={{ backgroundColor: color }}
-          onClick={() => {
-            setDraft(color);
-            setEditing(true);
-            setTimeout(() => inputRef.current?.focus(), 50);
-          }}
-          title="Click to edit colour"
+      {/* Swatch = clickable wrapper around the hidden colour picker */}
+      <div
+        className="relative mx-auto mb-2 w-16 h-16 rounded-xl shadow-md border-2 border-amber-300 cursor-pointer hover:border-amber-500 transition-colors group"
+        style={{ backgroundColor: hex }}
+        title={`Click to pick ${label} colour`}
+        onClick={() => pickerRef.current?.click()}
+      >
+        {/* Overlay pencil icon */}
+        <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-xl">
+          <Pencil className="w-5 h-5 text-white drop-shadow" />
+        </span>
+        {/* Hidden native colour picker — covers the swatch so click lands on it */}
+        <input
+          ref={pickerRef}
+          type="color"
+          value={/^#[0-9a-fA-F]{6}$/.test(hex) ? hex : color}
+          onChange={(e) => setHex(e.target.value)}
+          onBlur={(e) => commit(e.target.value)}
+          className="sr-only"
+          aria-label={`${label} colour picker`}
         />
-        {!editing && (
-          <button
-            type="button"
-            aria-label={`Edit ${label} colour`}
-            onClick={() => {
-              setDraft(color);
-              setEditing(true);
-              setTimeout(() => inputRef.current?.focus(), 50);
-            }}
-            className="absolute -top-1 -right-1 hidden group-hover:flex w-5 h-5 rounded-full bg-white border border-amber-300 items-center justify-center shadow"
-          >
-            <Pencil className="w-2.5 h-2.5 text-amber-700" />
-          </button>
-        )}
       </div>
 
-      {editing ? (
-        <div className="flex flex-col items-center gap-1 mt-1">
-          <div className="flex items-center gap-1">
-            <input
-              type="color"
-              value={draft.startsWith('#') && /^#[0-9a-fA-F]{6}$/.test(draft) ? draft : color}
-              onChange={(e) => setDraft(e.target.value)}
-              className="w-8 h-8 rounded cursor-pointer border border-slate-300"
-              title="Pick a colour"
-            />
-            <input
-              ref={inputRef}
-              type="text"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commit();
-                if (e.key === 'Escape') {
-                  setEditing(false);
-                  setDraft(color);
-                }
-              }}
-              className="w-20 text-xs rounded border border-slate-300 px-1 py-0.5 font-mono text-center"
-              placeholder="#RRGGBB"
-              maxLength={7}
-            />
-            <button type="button" onClick={commit} className="p-0.5 text-emerald-600 hover:text-emerald-800">
-              <Check className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditing(false);
-                setDraft(color);
-              }}
-              className="p-0.5 text-red-500 hover:text-red-700"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <p className="text-xs font-medium text-slate-700">{label}</p>
-          <p className="text-xs text-slate-500">{color}</p>
-        </>
-      )}
+      {/* Hex text input */}
+      <input
+        type="text"
+        value={hex}
+        onChange={(e) => setHex(e.target.value)}
+        onBlur={(e) => commit(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') commit(hex); }}
+        maxLength={7}
+        className="w-full text-center text-xs font-mono rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
+        aria-label={`${label} hex value`}
+      />
+      <p className="text-[11px] font-medium text-slate-600 dark:text-slate-400 mt-0.5">{label}</p>
     </div>
   );
 }

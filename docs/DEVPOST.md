@@ -1,162 +1,115 @@
 # Nyirira - Skin AI for Melanin-Rich Skin
 
-**Project URL:** [To be added upon submission]  
-**Demo Video:** [To be added upon submission]  
-**Tech Stack:** Next.js, TypeScript, TensorFlow.js, YouCam API
+**Project URL:** [devpost.com/software/nyirira-skin-ai-for-melanin-rich-skin](https://devpost.com/software/nyirira-skin-ai-for-melanin-rich-skin)
+**GitHub:** [github.com/drkNsubuga/nyirira](https://github.com/drkNsubuga/nyirira)
+**Tech Stack:** Next.js 16.4.3, TypeScript, TensorFlow.js, YouCam API (Skin Analysis + Makeup VTO + Look VTO)
 
-## Project Overview
-
-Nyirira is a revolutionary web application that brings safe, localized skincare diagnostics to the Ugandan market and beyond, specifically optimized for melanin-rich skin tones (Fitzpatrick V-VI). By leveraging the power of Perfect Corp's YouCam API, Nyirira addresses a critical gap in the beauty tech industry: the underrepresentation and misdiagnosis of skin concerns in darker skin tones.
+---
 
 ## The Problem
 
-Traditional skincare analysis tools often fail melanin-rich skin tones, leading to:
-- Inaccurate skin condition assessments
-- Inappropriate product recommendations
-- Wasted resources on ineffective treatments
-- Lack of trust in AI-driven beauty solutions
+Uganda has two compounding skin health crises affecting melanin-rich skin:
 
-Nyirira was born to solve this by providing tailored skincare insights that actually work for melanin-rich skin.
+1. **Generic AI tools misread Fitzpatrick V-VI.** Most skin analysis models are trained on lighter skin tones. They systematically misidentify post-inflammatory hyperpigmentation (PIH), ochronosis, and barrier damage on darker skin as generic acne or redness — producing irrelevant or harmful advice.
 
-## Solution & Features
+2. **Counterfeit cosmetics flood informal markets.** Kikuubo, Owino Market, and Instagram vendors sell products containing mercury, high-strength hydroquinone (>2%), and unlabelled corticosteroids. Victims have no way to check safety or report adverse reactions.
 
-### 1. Smart Skin Analysis
-- **Personalized Diagnostics:** Uses YouCam's advanced skin analysis API to provide accurate assessments of skin health, spots, texture, and redness specifically calibrated for melanin-rich skin.
-- **Safety-First Recommendations:** Identifies potentially harmful ingredients (e.g., hydroquinone) and provides safer alternatives.
-- **Barrier Health Focus:** Specialized analysis for skin barrier repair and maintenance.
+---
 
-### 2. Virtual Try-On (VTO)
-- **Makeup Recommendations:** Suggests suitable lip shades and makeup looks based on individual skin tone and analysis.
-- **Outfit Palette Integration:** Provides complementary color palettes for different occasions.
-- **Personalized Suggestions:** Goes beyond generic recommendations to offer culturally relevant beauty advice.
+## The Solution: Nyirira
 
-### 3. User Experience
-- **Real-time Validation:** Advanced image validation ensures optimal analysis conditions.
-- **Privacy-First:** All processing happens locally; no images are stored on servers.
-- **History Tracking:** Users can compare their skin analysis over time to track progress.
-- **Export Functionality:** Save analysis results as images for future reference.
+Nyirira is a mobile-first, privacy-first web application that gives melanin-rich skin the AI-powered diagnostics it deserves — and turns every scan into a community safety action.
 
-### 4. Technical Excellence
-- **Robust Error Handling:** Comprehensive error management for network issues, API limitations, and invalid inputs.
-- **Performance Optimized:** Efficient image processing and analysis with mock data fallback for development.
-## YouCam API Integration
+### Step 1 — Selfie Capture
+ML-powered quality validation (TensorFlow.js face detection, blur/lighting/orientation checks) runs entirely client-side before any API call. Images never leave the device during validation.
 
-Nyirira integrates multiple YouCam API endpoints to deliver comprehensive functionality:
+### Step 2 — Dual YouCam API Processing
 
-### Skin Analysis API
-- **Endpoint:** `analyzeImage`
-- **Functionality:** Processes uploaded images to analyze:
-  - Overall skin health score
-  - Spot detection and severity (hyperpigmentation, acne)
-  - Texture analysis (smoothness, roughness)
-  - Redness and inflammation levels
-  - Personalized product recommendations
-- **Implementation:** The `analyzeImageWithFallback` function in `youcamClient.ts` handles both live API calls and mock data for development.
+**Skin Analysis API** (`/s2s/v2.0/task/skin-analysis`)
+Evaluates spots, texture, redness, and radiance. The raw `uiskin_score` (0-100) drives everything downstream — safety flags, regimen recommendations, and look guidance. Nyirira requests `mask_urls` per concern type so affected areas can be overlaid directly on the user's photo.
 
-### Virtual Try-On API
-- **Endpoint:** `getVTOSuggestions`
-- **Functionality:** Provides:
-  - Recommended lipstick shades
-  - Outfit color palettes
-  - Beauty inspiration based on skin tone
-- **Implementation:** Transforms raw VTO data into user-friendly recommendations through the `transformVTOData` function.
+**Makeup VTO API** (`/s2s/v2.0/task/makeup-vto`)
+Powers the per-shade try-on feature: tapping any recommended lip shade calls the Makeup VTO API with that hex colour and renders the result inline. The same pipeline handles the editable colour palette — changing any swatch triggers a new VTO render with the selected colour.
 
-### Technical Challenges & Solutions
-- **TensorFlow.js Backend Registry:** Resolved bundling issues by explicitly importing CPU/WebGL backends to prevent "No backend found in registry" errors during face detection.
-- **Image Validation:** Implemented comprehensive validation pipeline for resolution, face detection, and image quality.
-- **Error Handling:** Created detailed mapping of YouCam API error codes to user-friendly guidance.
+**Look VTO API** (`/s2s/v2.0/task/look-vto`)
+Renders the initial harmonized look result.
 
-## Target Market & Impact
+### Step 3 — Results Dashboard
 
-### Primary Audience
-- Ugandan consumers with melanin-rich skin
-- Beauty enthusiasts of color
-- E-commerce shoppers looking for personalized beauty advice
-- Skincare professionals needing diagnostic tools
+**Analysis Results tab**
+- Health score ring with 4-band interpretation: critical (<50) / repair (50-69) / balance (70-84) / thrive (85+)
+- Anatomical damage markers placed on real facial zones (cheeks, forehead, temples, nasolabial folds, jaw, under-eye): PIH Spots, Inflammation, Texture, Barrier Damage — severe markers pulse
+- Toggle to YouCam mask overlays when live API returns `mask_urls`
 
-### Market Impact
-- **Democratizes Beauty Tech:** Makes advanced skincare analysis accessible to underserved markets
-- **Builds Trust:** Accurate diagnoses for melanin-rich skin increase confidence in AI beauty solutions
-- **Drives E-commerce:** Personalized product recommendations increase conversion for beauty retailers
-- **Health Education:** Promotes safer skincare practices and ingredient awareness
+**Safety & Regimen tab**
+- Flags targeting Uganda-specific damage patterns: ochronosis, PIH cycle, mercury/steroid abuse, equatorial UV index 10-14
+- Realistic regimens with named Ugandan brands and UGX prices (Vaseline from any shop, Bepanthen from Mulago Hospital pharmacy, raw shea from Owino Market, CeraVe at Uchumi Supermarket)
+- Critical band directs to Mulago Hospital dermatology
 
-## Technical Implementation
+**Harmonized Look tab**
+- Tap any lip shade → YouCam Makeup VTO renders inline (cached per shade)
+- Click any palette swatch → native colour-picker wheel opens immediately → committing the colour triggers a live VTO render with that hex
+- Score-aware Kitenge-inspired palette (Deep Emerald / Warm Gold / Terracotta)
 
-### Architecture
-- **Frontend:** Next.js with TypeScript for optimal performance and type safety
-- **API Integration:** Custom client (`youcamClient.ts`) with mock/fallback mechanism
-- **Image Processing:** Client-side validation and compression
-- **State Management:** React hooks with localStorage persistence
-- **UI Components:** Custom React components with Lucide React icons
+**Community Watch tab**
+- Counterfeit prompt appears when scan flags chemical irritation indicators
+- Report form: product name, vendor, Uganda market location, batch number, symptom checklist, and **product photo proof** (camera or file upload)
+- Feed: RED ALERT / WARNING / VERIFIED SAFE tiers with product thumbnails
+- Pre-seeded RED ALERT data: Skin Light Body Lotion, Movate Skin Tone Cream
+- UNBS emergency contact (+256 41 4505995) in footer
 
-### Key Files
-- `app/page.tsx` - Main application component and state management
-- `lib/youcamClient.ts` - YouCam API integration and data transformation
-- `lib/advancedValidation.ts` - Image validation pipeline
-- `lib/types.ts` - TypeScript interfaces for API responses
-- `lib/storage.ts` - Local storage utilities
-- `components/` - Reusable UI components
+### Step 4 — Scan Comparison
+Side-by-side photos with animated SVG score rings, stacked metric bars (previous vs current), and spots severity trend.
 
-## Development Journey
+---
 
-### API Surprises
-During development, we discovered that the YouCam API's skin analysis is remarkably accurate for hyperpigmentation detection in melanin-rich skin, often identifying concerns users hadn't noticed. However, we also encountered limitations in the VTO color recommendations for very dark skin tones, which inspired us to develop additional filtering and personalization logic.
+## YouCam API Integration Details
 
-### Technical Challenges
-The most significant challenge was resolving TensorFlow.js backend registry conflicts in a Next.js environment. Bundlers were tree-shaking essential backend registrations, causing face detection to fail. We solved this by explicitly importing CPU and WebGL backends with a fallback mechanism, ensuring robust functionality across different browser environments.
+| API | Endpoint | What Nyirira uses it for |
+|---|---|---|
+| Skin Analysis | `/s2s/v2.0/task/skin-analysis` | `uiskin_score`, spot severity, texture, redness, `mask_urls` for overlays |
+| Look VTO | `/s2s/v2.0/task/look-vto` | Initial harmonized look rendered image |
+| Makeup VTO | `/s2s/v2.0/task/makeup-vto` | Per-shade lip colour renders, palette colour renders |
+| File API | `/s2s/v2.0/file` | Single upload; file_id reused across all three tasks |
 
-### Future Enhancements
-- Mobile app development for broader reach
-- Integration with local Ugandan beauty retailers
-- Advanced acne tracking and treatment plans
-- Community features for user experiences and product reviews
+All three tasks share one uploaded `file_id` — one upload per scan, no duplication.
 
-## Why Nyirira Matters
+---
 
-Nyirira isn't just another beauty app – it's a movement toward inclusive beauty technology. By providing accurate, localized skincare insights for melanin-rich skin, we're:
+## Technical Architecture
 
-1. **Reducing Health Disparities:** Making advanced skincare accessible to communities that have been historically underserved by beauty tech.
-2. **Building Confidence:** Helping users understand their skin better and make informed decisions about their beauty routines.
-3. **Supporting Local E-commerce:** Driving targeted sales for beauty brands that cater to diverse skin tones.
-4. **Educating Users:** Promulating safer skincare practices and ingredient awareness.
+- **Framework:** Next.js 16.4.3 (App Router), static export — Cloudflare Pages / Vercel, zero server cost
+- **Styling:** Tailwind CSS 4+, Slate/Emerald/Amber/Red palette, full dark mode
+- **ML validation:** TensorFlow.js + Tesseract.js, all client-side
+- **State:** React `useState` + `localStorage` — no backend database
+- **Fonts:** Geist self-hosted via `next/font/local` (no Google Fonts network dependency)
+- **Security:** Next.js 16.4.3 — patched for GHSA-673q-mjm6-r5xr, GHSA-2464-fhr4-w9xw, GHSA-p3m5-59mp-jv5r
 
-Join us in redefining beauty tech for everyone, starting with melanin-rich skin in Uganda and beyond.
+---
+
+## Technical Challenges
+
+**TensorFlow.js backend registry conflicts:** Bundler tree-shaking removed CPU/WebGL backend registrations, causing silent face-detection failures. Fixed by explicitly importing both backends with a try/catch fallback and adding them to `transpilePackages` in `next.config.ts`.
+
+**YouCam error payload shapes:** Task errors nest under `data.error` while file-init errors are flat. Built a unified `parseYouCamErrorPayload` parser that maps 25+ error codes to plain-English guidance — users see "Move closer to the camera" rather than raw JSON.
+
+**Static export + CRLF:** PowerShell here-strings write CRLF line endings; git's `autocrlf` then staged whitespace-only diffs. Fixed by normalising all file writes to LF using `[System.IO.File]::WriteAllText` with `UTF8Encoding(false)`.
+
+---
+
+## Privacy
+
+**Your privacy comes first.** All photo analysis runs locally on your device. If you use the optional live API, images are processed by Perfect Corp (YouCam) and deleted within 24 hours. Community reports are stored in your browser only — no backend, no accounts.
+
+---
+
+## Impact
+
+- **Health equity:** Accurate Fitzpatrick V-VI diagnostics for a market systematically underserved by Western beauty AI
+- **Consumer protection:** The only skincare AI tool that converts a personal scan directly into a community safety alert for Uganda's informal cosmetics market
+- **UNBS pathway:** Batch number capture in reports is designed for future Uganda National Bureau of Standards enforcement integration
+- **Zero-cost access:** Static hosting — no server, no subscription, works on 4G
 
 ---
 
 *Built for the YouCam API Skin AI & eCommerce VTO Hackathon*
-- **Responsive Design:** Works seamlessly across desktop and mobile devices.
-
----
-
-## 5. Crowdsourced Counterfeit Detection & Community Safety Watch
-
-### The Problem
-Uganda's informal beauty market (Kikuubo, Owino, Instagram vendors) is flooded with counterfeit skincare products containing illegal bleaching agents — hydroquinone above 2%, mercury, and corticosteroids. Victims rarely report adverse reactions because no accessible channel exists.
-
-### Our Solution
-Nyirira's Step 4 turns every skin scan into a community safety action:
-
-**Diagnostic Trigger:** When the AI flags high redness (≥40%), moderate/severe spots, or a critical safety flag (chemical bleaching indicators), the app surfaces an interactive prompt — *"Did this barrier damage start after using a recent product?"*
-
-**ReportCounterfeitModal:** A clean bottom-sheet form lets users log:
-- Product name + vendor/brand
-- Purchase location (pre-populated Ugandan markets: Kikuubo, Owino, Nakasero, Instagram vendors, etc.)
-- Optional batch number (UNBS traceability)
-- Multi-select symptom checklist: Burning/Stinging, Skin Thinning/Veins, Ochronosis, Severe Acne
-
-Reports are saved to `localStorage` — simulating a crowdsourced data pipeline with zero backend cost.
-
-**CommunitySafetyWatch Feed:** A searchable, filterable feed in the "Community Watch" tab shows:
-- 🔴 **RED ALERT** — 3+ chemical burn/mercury reports (e.g. Skin Light Body Lotion, Movate Skin Tone Cream)
-- 🟡 **WARNING** — 1–2 reports under review
-- 🟢 **VERIFIED SAFE** — curated authentic products (Nivea, Vaseline)
-
-Filters: product/brand search + Uganda market dropdown + risk level dropdown.
-
-Footer directs serious hazard cases to UNBS (+256 41 4505995).
-
-### Impact
-- Empowers ordinary Ugandan consumers to protect each other
-- Creates a verifiable adverse-reaction dataset for future UNBS integration
-- Reduces harm from counterfeit products in underserved markets
