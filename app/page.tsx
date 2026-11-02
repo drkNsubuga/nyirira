@@ -538,17 +538,17 @@ export default function Home() {
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-emerald-50 to-amber-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <header className="sticky top-0 z-40 bg-white shadow-sm dark:bg-slate-900">
         <div className="max-w-4xl mx-auto px-4 py-6 flex items-center justify-between gap-3">
-          <button
-            type="button"
+          <Link
+            href="/"
             onClick={handleGoHome}
             aria-label="Go to home"
-            className="flex items-center gap-3 text-left"
+            className="flex items-center gap-3"
           >
             <Sparkles className="w-6 h-6 text-emerald-600" />
             <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-amber-600 bg-clip-text text-transparent">
               Nyirira
             </h1>
-          </button>
+          </Link>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -871,3 +871,4 @@ export default function Home() {
     </div>
   );
 }
+
