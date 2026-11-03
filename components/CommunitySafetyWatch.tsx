@@ -119,19 +119,20 @@ function RiskBadge({ level }: { level: CommunityAlert['riskLevel'] }) {
 }
 
 export default function CommunitySafetyWatch() {
-  const [reports, setReports] = useState<CounterfeitReport[]>([]);
+  const [reports, setReports] = useState<CounterfeitReport[]>(() => {
+    try {
+      const raw = localStorage.getItem(COUNTERFEIT_REPORTS_KEY);
+      if (raw) return JSON.parse(raw) as CounterfeitReport[];
+    } catch {
+      // ignore
+    }
+    return [];
+  });
   const [query, setQuery] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [riskFilter, setRiskFilter] = useState<CommunityAlert['riskLevel'] | ''>('');
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(COUNTERFEIT_REPORTS_KEY);
-      if (raw) setReports(JSON.parse(raw) as CounterfeitReport[]);
-    } catch {
-      // ignore
-    }
-
     const handler = (e: StorageEvent) => {
       if (e.key === COUNTERFEIT_REPORTS_KEY && e.newValue) {
         try {

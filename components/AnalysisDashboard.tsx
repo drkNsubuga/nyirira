@@ -5,7 +5,7 @@ import ReportCounterfeitModal from './ReportCounterfeitModal';
 import ImageOverlay from './ImageOverlay';
 import { AnalysisResponse } from '@/lib/types';
 import { applyMakeupVTO, getLastFileId, shouldUseRealApi } from '@/lib/youcamClient';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import {
   AlertTriangle,
@@ -154,11 +154,16 @@ function EditableSwatch({
 }) {
   const pickerRef = useRef<HTMLInputElement>(null);
   const [hex, setHex] = useState(color);
+  const hasSynced = useRef(false);
 
-  // Sync when parent resets
-  if (hex !== color && document.activeElement !== pickerRef.current) {
-    setHex(color);
-  }
+  // Sync when parent resets — run after render to avoid accessing refs during render.
+  useEffect(() => {
+    if (!hasSynced.current && hex !== color && document.activeElement !== pickerRef.current) {
+      setHex(color);
+      hasSynced.current = true;
+    }
+    if (hex === color) hasSynced.current = false;
+  }, [hex, color]);
 
   const commit = (value: string) => {
     const h = value.startsWith('#') ? value : `#${value}`;
